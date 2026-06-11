@@ -1,0 +1,39 @@
+# slice-state.yaml — machine-readable lifecycle state for one slice.
+# Copy this file to docs/delivery/slices/<slice-id>/slice-state.yaml and fill in.
+# Schema: ../slice-state.schema.md   Orchestration Map §2/§3 for stages/gates.
+# The slice-orchestrator reads this on resume and rewrites it after every stage transition.
+
+slice_id: <slice-id>                 # stable kebab-case id; matches the folder name (e.g. quicktodo-crud)
+
+current_stage: 0                     # 0–20, the Orchestration Map §3 stage the slice is in/entering
+
+risk_tier: standard                  # low | standard | high-assurance  (drives the §3.1 lite path)
+
+# One entry per gate evaluated so far. Empty list is valid at the start.
+gate_outcomes:
+  - gate: stage-3-readiness          # gate name or stage
+    outcome: pending                 # pass | fail | needs-revision | blocked | approved | pending
+    date: 2026-01-01                 # ISO-8601 date the gate was evaluated
+    approver: null                   # human name for human gates (e.g. Stage 16); null for automated
+
+# The version manifest — the §21.1 re-eval trigger surface. A change here may require eval re-runs.
+pinned_versions:
+  model: <model-and-version>         # e.g. gpt-4.1-2025-xx
+  prompt: <prompt-id-or-version>     # prompt/version identifier
+  tool_schema: <tool-schema-version> # tool-schema version
+  orchestration: <orchestration-version>
+
+# Human-readable blockers currently preventing advance. Empty list when clear.
+open_blockers: []
+  # - "Awaiting ADR approval for new storage pattern (Stage 6)."
+
+# Pointers to artifacts this slice has produced. Repo-relative paths or external refs.
+# Keep raw eval transcripts external; store only repo-safe pointers here.
+artifacts:
+  slice_spec: <path-or-ref>          # e.g. docs/delivery/slices/<slice-id>/slice-spec.md
+  eval_contract: <path-or-ref>
+  eval_summary: <path-or-ref>        # summary in-repo; full artifacts external
+  closeout_package: <path-or-ref>
+  traceability_matrix: <path-or-ref>
+
+updated_at: 2026-01-01               # ISO-8601 date or datetime this file was last written

@@ -1,0 +1,63 @@
+# OS noise
+.DS_Store
+**/.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Editor / IDE noise
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+*.sublime-workspace
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.p12
+*.cer
+*.crt
+secrets/
+.secrets/
+
+# Azure / Microsoft local state
+.azure/
+.azd/
+.terraform/
+*.tfstate
+*.tfstate.*
+
+# Python / Node / general build outputs
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+node_modules/
+.next/
+dist/
+build/
+coverage/
+
+# Logs, temp, and generated scratch
+*.log
+*.tmp
+tmp/
+temp/
+.cache/
+.scratch/
+
+# Keep agent discovery and vendored standards trackable
+!.agents/
+!.agents/**
+!.claude/
+!.claude/**
+!standards/
+!standards/**
