@@ -28,6 +28,9 @@ Seam details and the swap analysis:
 [`../architecture/provider-and-storage-seams.md`](../architecture/provider-and-storage-seams.md).
 Copilot Studio tool-registration readiness (documentation only):
 [`copilot-studio-tool-readiness.md`](./copilot-studio-tool-readiness.md).
+Copilot Studio / Power Platform manual registration guide and curated Swagger
+artifact instructions:
+[`copilot-studio/registration-guide.md`](./copilot-studio/registration-guide.md).
 Concrete values needed for future live wiring (placeholders only):
 [`azure-lab-wiring-tomorrow.md`](./azure-lab-wiring-tomorrow.md).
 

@@ -1,0 +1,394 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "AI HR Hiring Agent Lab - Copilot Studio Evaluation Tools",
+    "version": "1.0.0",
+    "description": "Curated Swagger 2.0 registration artifact for Copilot Studio and Power Platform custom connector import. The source API contract remains openapi/evaluations-api.json (OpenAPI 3.1). This artifact exposes exactly two lab actions for synthetic single-candidate evaluation: submitEvaluation and getEvaluation."
+  },
+  "host": "function-app-host.example",
+  "basePath": "/",
+  "schemes": [
+    "https"
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "securityDefinitions": {
+    "function_key": {
+      "type": "apiKey",
+      "name": "x-functions-key",
+      "in": "header",
+      "description": "Azure Functions Function-level key supplied through the secure Copilot Studio or Power Platform connection/auth configuration. Do not commit the key value."
+    }
+  },
+  "security": [
+    {
+      "function_key": []
+    }
+  ],
+  "paths": {
+    "/api/evaluations": {
+      "post": {
+        "tags": [
+          "CandidateEvaluation"
+        ],
+        "operationId": "submitEvaluation",
+        "summary": "Submit one synthetic candidate evaluation",
+        "description": "Submit one synthetic candidate evaluation to the advisory Calibrated Evaluation Council for a sample position and approved rubric. Returns an evidence-grounded envelope that always requires human review. Never makes or implies a hiring decision.",
+        "security": [
+          {
+            "function_key": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Lab-Actor-Id",
+            "in": "header",
+            "required": true,
+            "type": "string",
+            "default": "copilot-e4-lab-user",
+            "description": "Temporary E4 lab simulated actor id. This is not production identity and is replaced by a later Entra-auth slice.",
+            "x-ms-summary": "Lab actor id",
+            "x-ms-visibility": "advanced"
+          },
+          {
+            "name": "X-Lab-Roles",
+            "in": "header",
+            "required": true,
+            "type": "string",
+            "default": "hr",
+            "description": "Temporary E4 lab simulated role list. Use hr for this lab smoke. This is not production authorization.",
+            "x-ms-summary": "Lab roles",
+            "x-ms-visibility": "advanced"
+          },
+          {
+            "name": "X-Lab-Actor-Display",
+            "in": "header",
+            "required": false,
+            "type": "string",
+            "default": "Copilot E4 Lab User",
+            "description": "Optional display name for the temporary E4 lab simulated actor.",
+            "x-ms-summary": "Lab actor display",
+            "x-ms-visibility": "advanced"
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "type": "string",
+            "description": "Idempotency key for the submission. Equivalent to body idempotency_key; provide one of the two.",
+            "x-ms-summary": "Idempotency key"
+          },
+          {
+            "name": "X-Correlation-Id",
+            "in": "header",
+            "required": false,
+            "type": "string",
+            "description": "Optional caller correlation id for tracing.",
+            "x-ms-summary": "Correlation id",
+            "x-ms-visibility": "advanced"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/EvaluationRequest"
+            },
+            "description": "Synthetic evaluation request body."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Standard response envelope. Business outcomes are returned in the envelope status and remain advisory decision support only.",
+            "schema": {
+              "$ref": "#/definitions/Envelope"
+            },
+            "examples": {
+              "application/json": {
+                "status": "completed",
+                "evaluation_id": "eval-e4-sample-0001",
+                "case_id": null,
+                "correlation_id": "corr-e4-sample-0001",
+                "user_message": "Advisory evaluation completed. This output is decision support for a human reviewer; it is not a hiring decision.",
+                "safe_details": null,
+                "result": {
+                  "decision_support_only": true,
+                  "human_review_required": true,
+                  "ai_backend_type": "none",
+                  "provider_id": "deterministic_mock"
+                },
+                "errors": [],
+                "warnings": []
+              }
+            }
+          }
+        },
+        "x-ms-examples": {
+          "Synthetic fixture evaluation": {
+            "parameters": {
+              "X-Lab-Actor-Id": "copilot-e4-lab-user",
+              "X-Lab-Roles": "hr",
+              "X-Lab-Actor-Display": "Copilot E4 Lab User",
+              "Idempotency-Key": "e4-copilot-sample-001",
+              "body": {
+                "position_id": "pos-sample-001",
+                "candidate_ref": "cand-sample-001"
+              }
+            },
+            "responses": {
+              "200": {
+                "body": {
+                  "status": "completed",
+                  "evaluation_id": "eval-e4-sample-0001",
+                  "case_id": null,
+                  "correlation_id": "corr-e4-sample-0001",
+                  "user_message": "Advisory evaluation completed. This output is decision support for a human reviewer; it is not a hiring decision.",
+                  "safe_details": null,
+                  "result": {
+                    "decision_support_only": true,
+                    "human_review_required": true,
+                    "ai_backend_type": "none",
+                    "provider_id": "deterministic_mock"
+                  },
+                  "errors": [],
+                  "warnings": []
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/evaluations/{evaluation_id}": {
+      "get": {
+        "tags": [
+          "CandidateEvaluation"
+        ],
+        "operationId": "getEvaluation",
+        "summary": "Retrieve one persisted evaluation audit record",
+        "description": "Retrieve the persisted audit record for a prior synthetic evaluation by evaluation_id. The returned record is advisory decision support only and must be reviewed by a human.",
+        "security": [
+          {
+            "function_key": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Lab-Actor-Id",
+            "in": "header",
+            "required": true,
+            "type": "string",
+            "default": "copilot-e4-lab-user",
+            "description": "Temporary E4 lab simulated actor id. This is not production identity and is replaced by a later Entra-auth slice.",
+            "x-ms-summary": "Lab actor id",
+            "x-ms-visibility": "advanced"
+          },
+          {
+            "name": "X-Lab-Roles",
+            "in": "header",
+            "required": true,
+            "type": "string",
+            "default": "hr",
+            "description": "Temporary E4 lab simulated role list. Use hr for this lab smoke. This is not production authorization.",
+            "x-ms-summary": "Lab roles",
+            "x-ms-visibility": "advanced"
+          },
+          {
+            "name": "X-Lab-Actor-Display",
+            "in": "header",
+            "required": false,
+            "type": "string",
+            "default": "Copilot E4 Lab User",
+            "description": "Optional display name for the temporary E4 lab simulated actor.",
+            "x-ms-summary": "Lab actor display",
+            "x-ms-visibility": "advanced"
+          },
+          {
+            "name": "evaluation_id",
+            "in": "path",
+            "required": true,
+            "type": "string",
+            "description": "Evaluation id returned by submitEvaluation.",
+            "x-ms-summary": "Evaluation id"
+          },
+          {
+            "name": "X-Correlation-Id",
+            "in": "header",
+            "required": false,
+            "type": "string",
+            "description": "Optional caller correlation id for tracing.",
+            "x-ms-summary": "Correlation id",
+            "x-ms-visibility": "advanced"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Standard response envelope. Business outcomes are returned in the envelope status and remain advisory decision support only.",
+            "schema": {
+              "$ref": "#/definitions/Envelope"
+            },
+            "examples": {
+              "application/json": {
+                "status": "completed",
+                "evaluation_id": "eval-e4-sample-0001",
+                "case_id": null,
+                "correlation_id": "corr-e4-sample-0001",
+                "user_message": "Advisory evaluation completed. This output is decision support for a human reviewer; it is not a hiring decision.",
+                "safe_details": null,
+                "result": {
+                  "decision_support_only": true,
+                  "human_review_required": true,
+                  "ai_backend_type": "none",
+                  "provider_id": "deterministic_mock"
+                },
+                "errors": [],
+                "warnings": []
+              }
+            }
+          }
+        },
+        "x-ms-examples": {
+          "Synthetic evaluation audit retrieval": {
+            "parameters": {
+              "X-Lab-Actor-Id": "copilot-e4-lab-user",
+              "X-Lab-Roles": "hr",
+              "X-Lab-Actor-Display": "Copilot E4 Lab User",
+              "evaluation_id": "eval-e4-sample-0001"
+            },
+            "responses": {
+              "200": {
+                "body": {
+                  "status": "completed",
+                  "evaluation_id": "eval-e4-sample-0001",
+                  "case_id": null,
+                  "correlation_id": "corr-e4-sample-0001",
+                  "user_message": "Advisory evaluation completed. This output is decision support for a human reviewer; it is not a hiring decision.",
+                  "safe_details": null,
+                  "result": {
+                    "decision_support_only": true,
+                    "human_review_required": true,
+                    "ai_backend_type": "none",
+                    "provider_id": "deterministic_mock"
+                  },
+                  "errors": [],
+                  "warnings": []
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "EvaluationRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "position_id"
+      ],
+      "description": "One synthetic fixture-reference lab evaluation request. The E4 Copilot registration artifact intentionally does not expose inline resume or cover-letter text fields.",
+      "properties": {
+        "position_id": {
+          "type": "string",
+          "description": "Known synthetic fixture position id.",
+          "default": "pos-sample-001",
+          "x-ms-summary": "Position id"
+        },
+        "candidate_ref": {
+          "type": "string",
+          "description": "Known synthetic fixture candidate reference. Use cand-sample-001 for E4 registration smoke tests.",
+          "default": "cand-sample-001",
+          "x-ms-summary": "Candidate reference"
+        },
+        "idempotency_key": {
+          "type": "string",
+          "description": "Optional idempotency key body field. Equivalent to the Idempotency-Key header.",
+          "x-ms-summary": "Idempotency key",
+          "x-ms-visibility": "advanced"
+        },
+        "evaluation_question": {
+          "type": "string",
+          "description": "Optional synthetic lab focus question.",
+          "x-ms-summary": "Evaluation question",
+          "x-ms-visibility": "advanced"
+        },
+        "requested_rigor": {
+          "type": "string",
+          "enum": [
+            "standard",
+            "high_impact",
+            "escalated"
+          ],
+          "description": "Optional advisory requested rigor. The server never allows this to lower resolved rigor.",
+          "x-ms-summary": "Requested rigor",
+          "x-ms-visibility": "advanced"
+        }
+      }
+    },
+    "Envelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status"
+      ],
+      "description": "Existing app response envelope, unchanged for E4.",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "completed",
+            "blocked",
+            "validation_failed",
+            "unauthorized",
+            "needs_input",
+            "error"
+          ],
+          "description": "Envelope status. needs_input and error are reserved in the current app contract."
+        },
+        "evaluation_id": {
+          "type": "string",
+          "x-nullable": true
+        },
+        "case_id": {
+          "type": "string",
+          "x-nullable": true,
+          "description": "Always null for the current case-less lab workflow."
+        },
+        "correlation_id": {
+          "type": "string",
+          "x-nullable": true
+        },
+        "user_message": {
+          "type": "string"
+        },
+        "safe_details": {
+          "type": "string",
+          "x-nullable": true
+        },
+        "result": {
+          "type": "object",
+          "x-nullable": true,
+          "additionalProperties": true,
+          "description": "Existing result payload. submitEvaluation returns the advisory result; getEvaluation returns the full persisted audit record."
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
