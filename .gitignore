@@ -54,6 +54,9 @@ temp/
 .cache/
 .scratch/
 
+# Local-only incoming material (raw uploaded test-data zips; inspect here, never commit)
+.local/
+
 # Local lab persistence root (slice-e1: blob-equivalent records + table-equivalent
 # JSONL rows live here at runtime; never committed)
 var/

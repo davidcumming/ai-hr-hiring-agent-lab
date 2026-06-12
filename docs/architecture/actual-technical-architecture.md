@@ -238,6 +238,7 @@ nothing below should be read as implemented:
 
 - [`candidate-evaluation-council-architecture.md`](./candidate-evaluation-council-architecture.md) — council subsystem detail.
 - [`provider-and-storage-seams.md`](./provider-and-storage-seams.md) — seam contracts and what an Azure swap would touch.
+- [`candidate-evaluation-fixture-architecture.md`](./candidate-evaluation-fixture-architecture.md) — fixture package structure, manifests/hashing, validation tests, and the (future-only) routing intent toward Blob/Copilot/Foundry/Search.
 
 There are no architecture guideline documents and no approved ADRs in this
 repository's `docs/architecture/` tree at this time.

@@ -410,6 +410,18 @@ description + versioned rubric `rub-sample-001`) and one synthetic candidate
 `synthetic: true`). All fixtures are synthetic lab data; the manifest states
 no real applicant data is permitted.
 
+A separate curated business fixture package exists at
+`fixtures/business/e1-candidate-evaluation/` (`fixpkg-e1-business` v1.0.0):
+one realistic position scenario (Senior Manager, Digital Health Strategy)
+with a derived rubric (PO-approved for synthetic/test-only lab evaluation;
+no production hiring approval), six candidates (including
+fairness-trap, injection-trap, and missing-cover-letter cases), five HR
+policy documents, and its own hashed manifest. It supplements — and is not
+resolvable through — the runtime `FixtureStore`, which remains bound to the
+fixtures above; business candidate content runs via inline text submission.
+It is validated by `tests/test_business_fixtures.py` (15 tests). See
+[`candidate-evaluation-fixtures.md`](./candidate-evaluation-fixtures.md).
+
 ## 19. Logging and never-log guarantees
 
 `logging_setup.py`: log records carry only ids, hashes, statuses, role names,
