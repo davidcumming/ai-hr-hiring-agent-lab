@@ -1,0 +1,16 @@
+{
+  "comment": "SAMPLE role-to-template and role-to-future-agent mapping. Source-controlled placeholder for the live-wiring slice. The deterministic mock records template id/version per invocation; no agent exists or is selected today (runtime shape is the deferred ADR's human decision). No real agent IDs, deployments, or endpoints — placeholders only.",
+  "schema_version": "1.0",
+  "roles": {
+    "request_normalizer": { "prompt_template": "prompt-request_normalizer@v1", "future_agent_ref": "<foundry-agent-or-deployment-placeholder>" },
+    "evidence_extraction": { "prompt_template": "prompt-evidence_extraction@v1", "future_agent_ref": "<foundry-agent-or-deployment-placeholder>" },
+    "merit_advocate": { "prompt_template": "prompt-merit_advocate@v1", "future_agent_ref": "<foundry-agent-or-deployment-placeholder>" },
+    "risk_gaps_advocate": { "prompt_template": "prompt-risk_gaps_advocate@v1", "future_agent_ref": "<foundry-agent-or-deployment-placeholder>" },
+    "neutral_scoring_judge": { "prompt_template": "prompt-neutral_scoring_judge@v1", "future_agent_ref": "<foundry-agent-or-deployment-placeholder>" },
+    "policy_fairness_auditor": { "prompt_template": "prompt-policy_fairness_auditor@v1", "future_agent_ref": "<foundry-agent-or-deployment-placeholder>" },
+    "synthesis_judge": { "prompt_template": "prompt-synthesis_judge@v1", "future_agent_ref": "<foundry-agent-or-deployment-placeholder>" },
+    "quality_gate_evaluator": { "prompt_template": "prompt-quality_gate_evaluator@v1", "future_agent_ref": "<code-role-today; future validator-agent placeholder>" },
+    "second_synthesis_judge": { "prompt_template": "prompt-second_synthesis_judge@v1", "future_agent_ref": "<foundry-agent-or-deployment-placeholder>" },
+    "rubric_calibration_judge": { "prompt_template": "prompt-rubric_calibration_judge@v1", "future_agent_ref": "<foundry-agent-or-deployment-placeholder>" }
+  }
+}

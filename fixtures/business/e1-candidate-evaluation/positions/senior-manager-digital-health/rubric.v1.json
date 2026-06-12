@@ -1,0 +1,98 @@
+{
+  "rubric_id": "rub-smdh-001",
+  "position_id": "pos-smdh-001",
+  "version": "v1",
+  "status": "approved_synthetic_test_fixture",
+  "provisional": false,
+  "approval": {
+    "approved": true,
+    "approval_scope": "synthetic/test-only Slice E1 lab evaluation",
+    "approved_by": "Product Owner",
+    "approved_date": "2026-06-12",
+    "production_hiring_approval": false,
+    "note": "PO decision 2026-06-12: approved as a synthetic/test-only rubric for Slice E1 lab testing. This approval is limited to synthetic fixture testing and does NOT imply production hiring approval. History: derived fixture created 2026-06-11 because the uploaded test-data zip contained no completed rubric for this role (gap G-2, now resolved by this decision). Criteria are taken verbatim-in-substance from role-profile.md section 7 and job-posting.md approved qualifications; scale follows the repo council contract and rub-sample-001 precedent."
+  },
+  "synthetic": true,
+  "derivation": {
+    "criteria_sources": [
+      "role-profile.md section 7 (Sample Screening Rubric Considerations)",
+      "job-posting.md (Approved Required Qualifications / Approved Preferred Qualifications, from Sample-End-to-End-Hiring-Package.md sections 3-4)"
+    ],
+    "structure_sources": [
+      "policies/screening-rubric-standard.md sections 4-5 (core rubric structure, scoring approach)",
+      "fixtures/positions/pos-sample-001/rubric.v1.json (repo rubric schema and anchored-scale precedent)"
+    ],
+    "derived_date": "2026-06-11"
+  },
+  "scale": {
+    "min": 1,
+    "max": 5,
+    "anchors": {
+      "1": "No evidence the criterion is met",
+      "2": "Weak or indirect evidence only",
+      "3": "Partial direct evidence; gaps remain",
+      "4": "Direct evidence for most elements",
+      "5": "Direct, specific evidence for all elements"
+    }
+  },
+  "criteria": [
+    {
+      "criterion_id": "C1",
+      "name": "Strategy and program leadership experience",
+      "kind": "required",
+      "definition": "Significant experience in strategy, program leadership, digital health, healthcare transformation, or related fields, including leading strategic initiatives or workstreams.",
+      "evidence_expectations": "Named senior/strategy roles with durations; strategic initiatives led; strategic analyses, recommendations, or planning documents produced.",
+      "keywords": ["strategy", "strategic", "program leadership", "roadmap", "initiative", "transformation", "portfolio"]
+    },
+    {
+      "criterion_id": "C2",
+      "name": "Complex multi-stakeholder initiative coordination and delivery",
+      "kind": "required",
+      "definition": "Demonstrated experience coordinating and delivering complex initiatives involving multiple stakeholders (jurisdictions, partners, internal teams).",
+      "evidence_expectations": "Named multi-stakeholder initiatives, the candidate's coordinating role, and concrete delivery outcomes; cross-functional or multi-jurisdictional scope.",
+      "keywords": ["stakeholder", "multi-stakeholder", "coordination", "cross-functional", "jurisdiction", "partner", "working group", "delivery"]
+    },
+    {
+      "criterion_id": "C3",
+      "name": "Written communication and synthesis",
+      "kind": "required",
+      "definition": "Strong written communication and ability to synthesize complex information into clear recommendations.",
+      "evidence_expectations": "Specific document types produced (briefings, strategic analyses, reports, recommendations) and their audiences; the cover letter is admissible as a direct writing sample only.",
+      "keywords": ["briefing", "report", "recommendation", "synthesis", "communication", "presentation", "executive summary"]
+    },
+    {
+      "criterion_id": "C4",
+      "name": "Public-sector, healthcare, or similarly governed environment experience",
+      "kind": "required",
+      "definition": "Experience working in public-sector, healthcare, or similarly complex governance environments.",
+      "evidence_expectations": "Named public-sector/health-sector organizations or equivalently governed settings and the candidate's role within them.",
+      "keywords": ["public sector", "healthcare", "health system", "government", "governance", "policy", "non-profit", "regulated"]
+    },
+    {
+      "criterion_id": "C5",
+      "name": "Digital health and interoperability/standards familiarity",
+      "kind": "preferred",
+      "definition": "Familiarity with digital health interoperability initiatives, standards, healthcare information exchange, or implementation guidance.",
+      "evidence_expectations": "Named interoperability/standards work (e.g., information exchange initiatives, implementation guidance, conformance) and the candidate's contribution.",
+      "keywords": ["interoperability", "digital health", "standards", "information exchange", "FHIR", "implementation guidance", "conformance"]
+    },
+    {
+      "criterion_id": "C6",
+      "name": "Executive briefing experience",
+      "kind": "preferred",
+      "definition": "Experience briefing senior leadership or executive stakeholders.",
+      "evidence_expectations": "Named executive/senior-leadership audiences and the briefing artifacts or sessions delivered.",
+      "keywords": ["executive", "senior leadership", "briefing", "board", "leadership team", "presentation"]
+    }
+  ],
+  "unscored_assets": [
+    {
+      "name": "Bilingualism (English and French)",
+      "source": "job-posting.md preferred qualifications; role-profile.md section 5",
+      "note": "Listed as a preferred qualification in the sources but not scored in v1; record evidence neutrally if present."
+    }
+  ],
+  "disqualifying_factors": [],
+  "follow_up_areas_note": "Per screening-rubric-standard.md section 4.4, reviewers should record follow-up questions for ambiguous evidence rather than guessing; missing evidence is never invented (BR-013).",
+  "human_review_note": "Rubric output is advisory decision support only; every evaluation requires human review (decision_support_only: true, human_review_required: true)."
+}

@@ -1,0 +1,29 @@
+{
+  "applicant_id": "A001",
+  "name": "Nadia Belcourt",
+  "intended_fit_category": "strong",
+  "expected_import_status": "ready",
+  "prompt_injection_risk": false,
+  "proxy_signal_risk": false,
+  "duplicate_group": null,
+  "ambiguous_identity_or_file_match": false,
+  "unreadable_resume": false,
+  "cover_letter_missing": false,
+  "should_be_excluded_from_assessment_by_default": false,
+  "human_review_required": false,
+  "expected_assessment_notes": "Strong default assessment candidate: clear evidence of digital health strategy, product/program leadership, stakeholder engagement, interoperability awareness, privacy/security awareness, and measurable outcomes.",
+  "risk_notes": "",
+  "fixture_id": "cand-a001-nadia-belcourt",
+  "synthetic": true,
+  "provenance": {
+    "source_zip": "hr-test-data.zip",
+    "source_package": "phase-6-1-hr-recruitment-agent-synthetic-applicants-v1",
+    "source_paths": {
+      "metadata": "hr-test-data/phase-6.1-synthetic-applicant-data/applicants/A001-nadia-belcourt/metadata.json",
+      "resume": "hr-test-data/phase-6.1-synthetic-applicant-data/applicants/A001-nadia-belcourt/A001-nadia-belcourt-resume.md",
+      "cover_letter": "hr-test-data/phase-6.1-synthetic-applicant-data/applicants/A001-nadia-belcourt/A001-nadia-belcourt-cover-letter.md"
+    },
+    "curation_note": "All fields above except fixture_id, synthetic, and provenance are verbatim from the source metadata.json. Filenames normalized to resume.md / cover-letter.md.",
+    "curated_date": "2026-06-11"
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "applicant_id": "A020",
+  "name": "Arman Pike",
+  "intended_fit_category": "weak",
+  "expected_import_status": "ready",
+  "prompt_injection_risk": false,
+  "proxy_signal_risk": false,
+  "duplicate_group": null,
+  "ambiguous_identity_or_file_match": false,
+  "unreadable_resume": false,
+  "cover_letter_missing": false,
+  "should_be_excluded_from_assessment_by_default": false,
+  "human_review_required": false,
+  "expected_assessment_notes": "Weak assessment candidate: plausible professional background but limited evidence for senior digital health strategy, product leadership, interoperability, and vendor coordination.",
+  "risk_notes": "",
+  "fixture_id": "cand-a020-arman-pike",
+  "synthetic": true,
+  "provenance": {
+    "source_zip": "hr-test-data.zip",
+    "source_package": "phase-6-1-hr-recruitment-agent-synthetic-applicants-v1",
+    "source_paths": {
+      "metadata": "hr-test-data/phase-6.1-synthetic-applicant-data/applicants/A020-arman-pike/metadata.json",
+      "resume": "hr-test-data/phase-6.1-synthetic-applicant-data/applicants/A020-arman-pike/A020-arman-pike-resume.md",
+      "cover_letter": "hr-test-data/phase-6.1-synthetic-applicant-data/applicants/A020-arman-pike/A020-arman-pike-cover-letter.md"
+    },
+    "curation_note": "All fields above except fixture_id, synthetic, and provenance are verbatim from the source metadata.json. Filenames normalized to resume.md / cover-letter.md.",
+    "curated_date": "2026-06-11"
+  }
+}

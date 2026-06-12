@@ -1,0 +1,16 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "comment": "PLACEHOLDERS ONLY — no deployment occurs in this batch; real values arrive via an approved channel at the human-gated wiring slice and are never committed.",
+  "parameters": {
+    "namePrefix": { "value": "hrhalab" },
+    "location": { "value": "TODO-approved-canadian-region" }
+  },
+  "out_of_band_placeholders": {
+    "subscription_id": "<azure-subscription-id — never committed>",
+    "resource_group": "rg-hrha-lab-cac (suggested default)",
+    "tenant_id": "<entra-tenant-id — never committed>",
+    "entra_group_object_id_hr": "<object-id for the lab 'hr' role group — never committed>",
+    "entra_group_object_id_admin_lab": "<object-id for the lab 'admin_lab' group — never committed>"
+  }
+}
