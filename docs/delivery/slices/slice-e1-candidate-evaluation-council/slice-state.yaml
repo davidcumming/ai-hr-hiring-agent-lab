@@ -1,0 +1,117 @@
+# slice-state.yaml — machine-readable lifecycle state for slice-e1-candidate-evaluation-council.
+# Schema: standards/azure-development-standards/docs/delivery/slices/slice-state.schema.md
+# Stages/gates: standards/azure-development-standards/gentech_slice_lifecycle_orchestration_map.md (§2/§3)
+
+slice_id: slice-e1-candidate-evaluation-council
+
+# Stage 3 (readiness review, isolated-verification) complete 2026-06-11:
+# initial review = needs-revision (FIX-001 actor/role persistence, FIX-002 BQ-001 deferral framing);
+# spec revised (Stage 2 loop) and delta re-review = ready-for-eval-design. See artifacts.readiness_review.
+# PO decisions 2026-06-11 recorded in spec §2.1 (BQ-002) and §2.2 (OQ-003/BQ-004, BQ-001 deferred, BQ-005 deferred).
+# Stage 4 complete 2026-06-11: eval-risk-profiler assigned binding tier High-Assurance (confirms provisional);
+# eval-contract-designer produced hardened contract (DT-001..DT-018; LE-001..LE-007 deferred to wiring slice
+# with documented "live eval not applicable until Foundry wiring" rationale; UFM register extended with
+# UFM-012 actor-provenance and UFM-013 idempotent-replay; full deterministic suite = first regression baseline).
+# Stage 5 complete 2026-06-11: implementation plan written (Python 3.12 / FastAPI / pydantic v2 / pytest;
+# OQ-002 decided: auto_escalate INCLUDED behind server-side config, default record_only, with
+# escalation_provenance enum none|configured_escalated|policy_triggered; 16-step build order;
+# DT-001..DT-018 mapped to test files; live evals deferred as stubs). No blockers.
+# Stage 6 complete 2026-06-11: architecture-guideline-checker verdict CLEAR-for-local-implementation;
+# all spec §15 constraints compliant; adr-gap-detector confirmed single gap G-001 (live Foundry wiring)
+# dispositioned DEFERRED per PO §2.2.2 — stub at artifacts.adr_deferred_foundry_wiring, NOT approved,
+# human gate before any live wiring. Coding conditions: C-COND-1 HTTP-code mapping per API-contracts §4;
+# C-COND-2 nullable eval_run_id trace placeholder.
+# Stages 7-9 complete 2026-06-11:
+#   Stage 7 — local deterministic implementation built per implementation plan (src/hr_eval_lab/: facade,
+#     11-role council orchestration Mode A/B/C, rigor resolver + 6 triggers, escalation policy incl.
+#     auto_escalate, 6 quality gates w/ bounded retry, mock provider + lazy Foundry seam stub,
+#     storage-doc-shaped local persistence w/ actor-role provenance, OpenAPI, CLI, minimal CI).
+#   Stage 8 — deterministic suite DT-001..DT-018 authored: 88 passed, 7 skipped (LE-001..LE-007 stubs
+#     skip with the documented live-eval deferral rationale), 0 failed. OpenAPI drift check clean.
+#   Stage 9 — deviation log written (DEV-001..DEV-006); see artifacts.deviation_log.
+# 2026-06-11 — OUT-OF-BAND DOCUMENTATION CATCH-UP / CURRENT-STATE RECONCILIATION PASS
+# (run before the next coding batch; NOT a lifecycle advancement — Stage 10/11 eval summary
+# is still missing, so current_stage stays 9):
+#   - Stage-12-style reconciliation executed against the UNCOMMITTED working tree on main
+#     (single commit 44dd219; no feature branch, no useful diff; full-tree inspection).
+#     Created docs/product-current-state/ (README + candidate-evaluation-council),
+#     docs/architecture/ (actual-technical-architecture, candidate-evaluation-council-
+#     architecture, provider-and-storage-seams), docs/integration/README.md; fixed stale
+#     README.md "Current Scope". Artifact: artifacts.documentation_catchup.
+#   - Stage-13-style independent validation (fresh isolated subagent, read cold):
+#     result = non-blocking-gap (0 blocking, 1 non-blocking count typo since corrected,
+#     4 observations). Artifact: artifacts.doc_validation_current_state_baseline.
+#   - Evidence re-verified during the pass: pytest 88 passed / 7 skipped / 0 failed;
+#     OpenAPI drift check clean.
+#   - This pass does NOT mark implementation, eval summary, closeout, or merge complete.
+# Next: commit the working tree to a reviewable branch (HUMAN-gated), Stage 10/11
+# (live eval = documented deferral; eval summary), formal Stage 12/13 confirmation if
+# required, then the Stage 16 HUMAN gate (closeout/merge approval). Nothing has been
+# merged; no issues created.
+current_stage: 9
+
+sizing:
+  decision: accept-as-one-slice
+  decided_at: 2026-06-11
+  decided_by: slice-planning-agent (slice-sizer skill)
+  accepted_scope: >-
+    One synthetic candidate, one sample position, one approved versioned rubric, local
+    deterministic council execution with a Foundry Agents provider seam, API/OpenAPI
+    contract, local persistence/audit record, server-side runtime rigor modes, and
+    audit-ready advisory output; no live Azure/Foundry/Copilot/Entra wiring. Admin
+    rigor-configuration surface and live wiring deferred to follow-up slices.
+
+# BINDING tier assigned by eval-risk-profiler at Stage 4 (2026-06-11): High-Assurance.
+# Full un-collapsed lifecycle path applies; live evals required-but-deferred to the Foundry-wiring slice.
+risk_tier: high-assurance
+
+gate_outcomes:
+  - gate: stage-3-readiness-review
+    outcome: ready-for-eval-design
+    date: 2026-06-11
+    approver: independent reviewer subagent (slice-readiness-reviewer, isolated-verification); initial needs-revision fixes applied and verified in delta re-review
+    notes: Approves eval-design readiness only; coding readiness remains the Stage 16 human gate.
+
+# Pinned at Stage 7 (2026-06-11). No live model exists in this slice — deterministic mock backend only.
+pinned_versions:
+  model: none (ai_backend_type=none; deterministic mock; live model deferred to Foundry-wiring slice)
+  prompt: not-applicable (no model prompts in mock-backed slice; council role contracts pinned via schemas)
+  tool_schema: src/hr_eval_lab/domain/schemas/ (pydantic v2 single schema source; provider contract v1)
+  orchestration: council-composition-v1 (src/hr_eval_lab/domain/schemas/provider.py ORCHESTRATION_VERSION)
+
+# Non-blocking-for-Stage-1 items are tracked as open questions in the planning context (§8);
+# listed here are the ones that block later stages if unresolved.
+open_blockers: []   # none for local deterministic implementation; deferred items below gate the live-wiring slice only
+
+deferred_blockers:
+  - "BQ-001/OQ-001: AI-backend ADR (Foundry Agent Service vs Agent Framework workflow; live wiring details) DEFERRED per PO 2026-06-11 (spec §2.2.2). Local deterministic provider + Foundry seam coding proceeds. Human ADR approval required before the live-wiring slice."
+  - "BQ-005: Canadian region/Foundry deployment approval DEFERRED (spec §2.2.3); gates live Foundry calls only."
+
+resolved_blockers:
+  - "BQ-002 resolved 2026-06-11 by Product Owner: explicit effective_rigor=escalated executes Mode C; high_impact + triggers + escalation_policy=record_only (default) records only; auto_escalate optional/deferred unless cheap behind server-side config. Recorded in slice-spec.md §2.1 and BR-003..BR-006."
+  - "BQ-004/OQ-003 resolved 2026-06-11 by Product Owner: case-less authorization = lab/global role group only; CaseAcl deferred to future case workflow slice; actor/role context persisted on every record; synthetic/sample-only decision support. Recorded in slice-spec.md §2.2.1."
+
+artifacts:
+  planning_context: docs/delivery/slices/slice-e1-candidate-evaluation-council/planning-context.md
+  source_document_inventory: docs/delivery/slices/slice-e1-candidate-evaluation-council/source-document-inventory.md
+  sizing_assessment: docs/delivery/slices/slice-e1-candidate-evaluation-council/sizing.md
+  slice_spec: docs/delivery/slices/slice-e1-candidate-evaluation-council/slice-spec.md   # Revised 2026-06-11; readiness review passed
+  readiness_review: docs/delivery/slices/slice-e1-candidate-evaluation-council/readiness-review.md
+  eval_risk_profile: docs/delivery/slices/slice-e1-candidate-evaluation-council/eval-risk-profile.md
+  eval_contract: docs/delivery/slices/slice-e1-candidate-evaluation-council/eval-contract.md
+  implementation_plan: docs/delivery/slices/slice-e1-candidate-evaluation-council/implementation-plan.md
+  architecture_check: docs/delivery/slices/slice-e1-candidate-evaluation-council/architecture-check.md
+  adr_deferred_foundry_wiring: docs/delivery/slices/slice-e1-candidate-evaluation-council/adr-deferred-foundry-wiring.md
+  deviation_log: docs/delivery/slices/slice-e1-candidate-evaluation-council/deviation-log.md
+  implementation: src/hr_eval_lab/ (+ fixtures/, config/, openapi/, scripts/, .github/workflows/ci.yml)
+  deterministic_tests: tests/ (DT-001..DT-018 + smoke; live_evals/ LE stubs)
+  eval_summary: null
+  closeout_package: null
+  traceability_matrix: null
+  documentation_catchup: docs/delivery/slices/slice-e1-candidate-evaluation-council/documentation-catchup-current-state.md
+  doc_validation_current_state_baseline: docs/delivery/slices/slice-e1-candidate-evaluation-council/doc-validation-current-state-baseline.md
+  current_state_docs: docs/product-current-state/ (README.md, candidate-evaluation-council.md)
+  architecture_docs: docs/architecture/ (actual-technical-architecture.md, candidate-evaluation-council-architecture.md, provider-and-storage-seams.md)
+  integration_docs: docs/integration/README.md
+
+updated_at: 2026-06-11

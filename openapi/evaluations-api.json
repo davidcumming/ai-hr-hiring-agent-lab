@@ -1,0 +1,302 @@
+{
+  "components": {
+    "schemas": {
+      "Envelope": {
+        "additionalProperties": false,
+        "properties": {
+          "case_id": {
+            "title": "Case Id",
+            "type": "null"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlation Id"
+          },
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "evaluation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluation Id"
+          },
+          "result": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "safe_details": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Safe Details"
+          },
+          "status": {
+            "enum": [
+              "completed",
+              "blocked",
+              "validation_failed",
+              "unauthorized",
+              "needs_input",
+              "error"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "user_message": {
+            "default": "",
+            "title": "User Message",
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "Envelope",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "Advisory, evidence-grounded single-candidate evaluation (slice-e1-candidate-evaluation-council). Every result is decision support for a human reviewer (decision_support_only=true, human_review_required=true) \u2014 never a hiring decision, ranking, or candidate contact. Authentication uses SIMULATED lab identity headers (X-Lab-Actor-Id, X-Lab-Roles; the 'hr' role is required for both endpoints); this is a lab stand-in, never an Entra substitute. Envelope status vocabulary: completed | blocked | validation_failed | unauthorized are emitted; needs_input and error are RESERVED (declared, never emitted by this slice). HTTP mapping per the adopted API contracts: business outcomes return 200 with the envelope status; 400 malformed body; 401 missing identity; 403 authenticated without the required role.",
+    "title": "AI HR Hiring Agent Lab \u2014 Candidate Evaluation Council API",
+    "version": "1.0.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/evaluations": {
+      "post": {
+        "description": "Advisory-only: every result carries decision_support_only=true and human_review_required=true. Business outcomes (completed | blocked | validation_failed) return HTTP 200 with the status in the envelope; malformed bodies return HTTP 400; missing identity 401; authenticated callers without the 'hr' role 403 (envelope status 'unauthorized'). Envelope statuses 'needs_input' and 'error' are reserved and never emitted by this slice.",
+        "operationId": "post_evaluation_api_evaluations_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "description": "One evaluation request: fixture candidate by reference OR inline text.\n\n``requested_rigor`` is ADVISORY ONLY and can never lower the\nserver-resolved rigor (BR-002); any downgrade attempt is recorded.",
+                "properties": {
+                  "candidate_ref": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Candidate Ref"
+                  },
+                  "cover_letter_text": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Cover Letter Text"
+                  },
+                  "evaluation_question": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Evaluation Question"
+                  },
+                  "idempotency_key": {
+                    "minLength": 1,
+                    "title": "Idempotency Key",
+                    "type": "string"
+                  },
+                  "position_id": {
+                    "minLength": 1,
+                    "title": "Position Id",
+                    "type": "string"
+                  },
+                  "requested_rigor": {
+                    "anyOf": [
+                      {
+                        "enum": [
+                          "standard",
+                          "high_impact",
+                          "escalated"
+                        ],
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Requested Rigor"
+                  },
+                  "resume_text": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Resume Text"
+                  }
+                },
+                "required": [
+                  "position_id",
+                  "idempotency_key"
+                ],
+                "title": "EvaluationRequest",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Submit one candidate evaluation to the Calibrated Evaluation Council"
+      }
+    },
+    "/api/evaluations/{evaluation_id}": {
+      "get": {
+        "description": "Returns the persisted full audit record (every intermediate council output, rigor resolution, triggers, gate results, actor identity and role context) wrapped in the standard envelope. Requires the 'hr' role.",
+        "operationId": "get_evaluation_api_evaluations__evaluation_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "evaluation_id",
+            "required": true,
+            "schema": {
+              "title": "Evaluation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Retrieve the full audit record for one evaluation"
+      }
+    }
+  }
+}

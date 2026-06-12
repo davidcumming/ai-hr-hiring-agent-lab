@@ -54,6 +54,11 @@ temp/
 .cache/
 .scratch/
 
+# Local lab persistence root (slice-e1: blob-equivalent records + table-equivalent
+# JSONL rows live here at runtime; never committed)
+var/
+*.egg-info/
+
 # Keep agent discovery and vendored standards trackable
 !.agents/
 !.agents/**

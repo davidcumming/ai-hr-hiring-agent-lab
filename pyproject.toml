@@ -1,0 +1,36 @@
+# PLAN DEVIATION (recorded): implementation-plan.md §3.1 targets Python 3.12
+# (compatible >=3.11). The local execution environment for this slice provides
+# Python 3.10.12, so requires-python is lowered to >=3.10 and the code avoids
+# 3.11+-only stdlib/syntax (e.g. tomllib has a tomli fallback in config.py).
+# No behavioural requirement is affected; CI pins 3.10 to match.
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hr-eval-lab"
+version = "0.1.0"
+description = "AI HR Hiring Agent Lab - slice-e1 Single-Candidate Calibrated Evaluation Council (advisory, evidence-grounded, deterministic mock backend with Foundry seam)."
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "pydantic>=2",
+    'tomli; python_version < "3.11"',
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "httpx",
+    "openapi-spec-validator",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q"

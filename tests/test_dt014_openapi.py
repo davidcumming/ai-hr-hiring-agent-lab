@@ -1,0 +1,73 @@
+"""DT-014 — OpenAPI validation + contract-vs-implementation conformance.
+
+Related: AC-017, FR-010, RF-005.
+
+The committed openapi/evaluations-api.json must (a) be a valid OpenAPI
+document (openapi-spec-validator) and (b) byte-match the document regenerated
+from the live app factory (scripts/export_openapi.py --check semantics), so
+contract and implementation cannot silently diverge. The emitted status
+vocabulary is asserted against the document's envelope schema.
+"""
+
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+
+from openapi_spec_validator import validate as validate_spec
+
+from tests.conftest import REPO_ROOT
+
+OPENAPI_PATH = REPO_ROOT / "openapi" / "evaluations-api.json"
+
+
+def _committed_spec() -> dict:
+    return json.loads(OPENAPI_PATH.read_text(encoding="utf-8"))
+
+
+def test_committed_document_is_valid_openapi():
+    validate_spec(_committed_spec())
+
+
+def test_committed_document_matches_regenerated_output():
+    """export_openapi.py --check: exit 0 means zero drift."""
+    result = subprocess.run(
+        [sys.executable, str(REPO_ROOT / "scripts" / "export_openapi.py"), "--check"],
+        cwd=str(REPO_ROOT),
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert result.returncode == 0, f"OpenAPI drift detected:\n{result.stderr}"
+
+
+def test_routes_and_status_vocabulary_conform():
+    spec = _committed_spec()
+    paths = spec["paths"]
+    assert set(paths) == {"/api/evaluations", "/api/evaluations/{evaluation_id}"}
+    assert "post" in paths["/api/evaluations"]
+    assert "get" in paths["/api/evaluations/{evaluation_id}"]
+
+    # The envelope schema's status enum is the adopted fixed vocabulary
+    # (emitted four + the two declared-reserved values).
+    envelope = spec["components"]["schemas"]["Envelope"]
+    status_schema = envelope["properties"]["status"]
+    assert set(status_schema["enum"]) == {
+        "completed",
+        "blocked",
+        "validation_failed",
+        "unauthorized",
+        "needs_input",
+        "error",
+    }
+    # Reserved statuses are documented as reserved, never emitted.
+    description = spec["info"]["description"]
+    assert "RESERVED" in description
+
+    # Request body documents the single request schema source.
+    request_schema = paths["/api/evaluations"]["post"]["requestBody"]["content"][
+        "application/json"
+    ]["schema"]
+    for field in ("position_id", "idempotency_key", "requested_rigor"):
+        assert field in request_schema["properties"]

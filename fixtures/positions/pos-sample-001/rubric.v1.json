@@ -1,0 +1,73 @@
+{
+  "rubric_id": "rub-sample-001",
+  "position_id": "pos-sample-001",
+  "version": "v1",
+  "status": "approved_fixture",
+  "approved_note": "Pre-seeded fixture standing in for the Slice 2 rubric approval workflow. Synthetic only.",
+  "scale": { "min": 1, "max": 5, "anchors": {
+    "1": "No evidence the criterion is met",
+    "2": "Weak or indirect evidence only",
+    "3": "Partial direct evidence; gaps remain",
+    "4": "Direct evidence for most elements",
+    "5": "Direct, specific evidence for all elements"
+  }},
+  "criteria": [
+    {
+      "criterion_id": "C1",
+      "name": "Project/program coordination experience",
+      "kind": "required",
+      "definition": "3+ years coordinating projects or programs: schedules, deliverables, status reporting across concurrent workstreams.",
+      "evidence_expectations": "Named roles with durations; concrete coordination artifacts (plans, status reports, schedules).",
+      "keywords": ["project coordination", "program coordination", "status report", "schedule", "deliverable", "workstream", "project plan"]
+    },
+    {
+      "criterion_id": "C2",
+      "name": "Healthcare / public-sector stakeholder experience",
+      "kind": "required",
+      "definition": "Direct experience working with healthcare or public-sector stakeholders (clinical, policy, or government partners).",
+      "evidence_expectations": "Named healthcare/public-sector organizations or stakeholder groups and the candidate's role with them.",
+      "keywords": ["healthcare", "hospital", "clinical", "public sector", "government", "ministry", "health authority", "provincial"]
+    },
+    {
+      "criterion_id": "C3",
+      "name": "Written communication",
+      "kind": "required",
+      "definition": "Strong written communication evidenced by briefings, minutes, reports, or equivalent artifacts.",
+      "evidence_expectations": "Specific document types produced and their audience; the cover letter itself is admissible evidence of writing quality only as a direct sample.",
+      "keywords": ["briefing", "minutes", "report", "documentation", "communication", "memo", "decision log"]
+    },
+    {
+      "criterion_id": "C4",
+      "name": "Risk and issue tracking",
+      "kind": "required",
+      "definition": "Experience with structured risk/issue/dependency tracking and escalation.",
+      "evidence_expectations": "Named tools or frameworks (risk register, RAID log) and examples of escalation.",
+      "keywords": ["risk register", "RAID", "issue tracking", "risk", "escalation", "dependency"]
+    },
+    {
+      "criterion_id": "C5",
+      "name": "Project-management certification",
+      "kind": "preferred",
+      "definition": "PMP, CAPM, PRINCE2, or equivalent certification.",
+      "evidence_expectations": "Certification named with status (held / in progress).",
+      "keywords": ["PMP", "CAPM", "PRINCE2", "certification", "certified"]
+    },
+    {
+      "criterion_id": "C6",
+      "name": "Bilingual EN/FR",
+      "kind": "preferred",
+      "definition": "Working proficiency in both English and French.",
+      "evidence_expectations": "Explicit statement of French proficiency level or French-language work experience.",
+      "keywords": ["French", "bilingual", "francais", "FR"]
+    }
+  ],
+  "disqualifying_criteria": [
+    {
+      "criterion_id": "D1",
+      "name": "Work eligibility",
+      "definition": "Candidate must be eligible to work in Canada. Absence of a statement is MISSING EVIDENCE, never a disqualification.",
+      "keywords": ["eligible to work", "work permit", "citizen", "permanent resident"]
+    }
+  ],
+  "prohibited_factors_note": "Age, family status, national origin, religion, disability, photographs, address prestige, school prestige, and employment gaps are never scored. See council spec §12."
+}

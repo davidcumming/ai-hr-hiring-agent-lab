@@ -1,0 +1,54 @@
+{
+  "artifacts": [
+    {
+      "artifact_id": "pos-sample-001",
+      "path": "fixtures/positions/pos-sample-001/job-description.md",
+      "provenance": {
+        "source_path": "fixtures/sample-position/job-description.md",
+        "source_repo": "hr-hiring (read-only source documentation repo)",
+        "vendored_date": "2026-06-12"
+      },
+      "sha256": "d29735d54c5f16aec44d45d1afcc6968594787198dd51bc39280067f91db30c0",
+      "synthetic": true,
+      "version": "v1"
+    },
+    {
+      "artifact_id": "rub-sample-001",
+      "path": "fixtures/positions/pos-sample-001/rubric.v1.json",
+      "provenance": {
+        "source_path": "fixtures/sample-position/rubric.v1.json",
+        "source_repo": "hr-hiring (read-only source documentation repo)",
+        "vendored_date": "2026-06-12"
+      },
+      "sha256": "ea5594b25a42a661fb3c91287beeff86d5e9b392c87333266fe20ff6e734c578",
+      "synthetic": true,
+      "version": "v1"
+    },
+    {
+      "artifact_id": "cand-sample-001:resume",
+      "path": "fixtures/candidates/cand-sample-001/resume.md",
+      "provenance": {
+        "source_path": "fixtures/candidates/jordan-rivera/resume.md",
+        "source_repo": "hr-hiring (read-only source documentation repo)",
+        "vendored_date": "2026-06-12"
+      },
+      "sha256": "75e8a2710b3ac37f9d2026a5ef16214a68dda0dd5b6066fb8ac7e8f2fb9b36b9",
+      "synthetic": true,
+      "version": "v1"
+    },
+    {
+      "artifact_id": "cand-sample-001:cover_letter",
+      "path": "fixtures/candidates/cand-sample-001/cover-letter.md",
+      "provenance": {
+        "source_path": "fixtures/candidates/jordan-rivera/cover-letter.md",
+        "source_repo": "hr-hiring (read-only source documentation repo)",
+        "vendored_date": "2026-06-12"
+      },
+      "sha256": "c7370a74bab3df040ea170ce9310abc50287238078223ce702a062f98b69a1f8",
+      "synthetic": true,
+      "version": "v1"
+    }
+  ],
+  "manifest_version": "1",
+  "synthetic_notice": "All fixtures are SYNTHETIC lab data (BR-011). No real applicant data exists or is permitted in this repository."
+}

@@ -1,0 +1,22 @@
+# Server-side, source-controlled lab configuration (slice-e1).
+# Git history is the change record (slice spec §17). No secrets exist in this
+# file or anywhere in the repo. Tests exercise non-default states by
+# constructing the app with an explicit config object, never by editing this
+# committed file.
+
+[rigor]
+# standard | high_impact | escalated  (BR-001/BR-003)
+default_mode = "high_impact"
+
+[escalation]
+# record_only | auto_escalate  (BR-004/BR-005/BR-006; OQ-002 decided: implemented)
+policy = "record_only"
+
+[provider]
+# none | foundry_agents  ("foundry_agents" selects the non-functional seam stub
+# which raises ProviderNotConfiguredError on any use; live wiring is deferred)
+ai_backend_type = "none"
+
+[persistence]
+# Local store root (gitignored). Overridable via explicit config object in tests.
+root = "var/lab-data"
