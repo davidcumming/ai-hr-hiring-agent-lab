@@ -46,6 +46,13 @@ class ProviderMetadata(BaseModel):
     agent_run_id: Optional[str] = None
     model_deployment: Optional[str] = None
     prompt_version: Optional[str] = None
+    # Readiness-pack provider output contract additions (all deterministic /
+    # nullable under the mock; live semantics remain owned by the deferred ADR):
+    prompt_template_id: Optional[str] = None  # versioned prompt registry id
+    prompt_template_version: Optional[str] = None
+    model_or_agent_ref: Optional[str] = None  # null for mock
+    warnings: list[str] = Field(default_factory=list)
+    safe_error: Optional[str] = None  # safe category only; never raw provider errors
     orchestration_version: str = ORCHESTRATION_VERSION
     role_schema_version: str = PROVIDER_CONTRACT_VERSION
     token_usage: TokenUsage = Field(default_factory=TokenUsage)

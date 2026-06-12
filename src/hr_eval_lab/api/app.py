@@ -24,6 +24,7 @@ from hr_eval_lab.api.errors import (
 from hr_eval_lab.api.routes_evaluations import router
 from hr_eval_lab.config import LabConfig, load_config
 from hr_eval_lab.logging_setup import get_logger
+from hr_eval_lab.persistence.backend import select_backend
 from hr_eval_lab.persistence.store import LocalStore
 from hr_eval_lab.providers.base import CouncilProvider, select_provider
 from hr_eval_lab.sources.fixture_store import FixtureStore
@@ -61,7 +62,10 @@ def create_app(
     )
     app.state.config = config
     app.state.provider = provider
-    app.state.store = LocalStore(config.persistence.root)
+    # Storage backend is resolved from [storage] config at app construction —
+    # selecting azure_blob without complete config (or without live Azure
+    # explicitly enabled) fails closed here with StorageNotConfiguredError.
+    app.state.store = LocalStore(config.persistence.root, backend=select_backend(config))
     app.state.fixtures = FixtureStore(fixtures_root)
 
     app.add_exception_handler(ApiError, api_error_handler)
@@ -78,6 +82,19 @@ def create_app(
         )
 
     app.add_exception_handler(RequestValidationError, _validation_handler)
+
+    # Readiness pack: X-Correlation-Id response header. The route handlers set
+    # request.state.correlation_id from the envelope (server-assigned id);
+    # otherwise a caller-supplied X-Correlation-Id is echoed back.
+    @app.middleware("http")
+    async def _correlation_header(request: Request, call_next):
+        response = await call_next(request)
+        correlation_id = getattr(request.state, "correlation_id", None) or (
+            request.headers.get("X-Correlation-Id")
+        )
+        if correlation_id:
+            response.headers["X-Correlation-Id"] = correlation_id
+        return response
 
     app.include_router(router)
 

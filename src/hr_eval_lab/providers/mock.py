@@ -97,13 +97,29 @@ class DeterministicMockProvider(CouncilProvider):
         seed = hashlib.sha256(
             (canonical_packet_json(packet) + "|" + role_id).encode("utf-8")
         ).hexdigest()
+        # Prompt provenance: templates are RECORDED, never executed, under the
+        # mock (the registry is source-controlled config; readiness target 4).
+        try:
+            from hr_eval_lab.prompts.registry import get_template
+
+            template = get_template(role_id)
+            prompt_template_id: str | None = template.template_id
+            prompt_template_version: str | None = template.version
+        except KeyError:
+            prompt_template_id = None
+            prompt_template_version = None
         metadata = ProviderMetadata(
             ai_backend_type="none",
             trace_id=f"local-{seed[:16]}",
             eval_run_id=None,  # nullable placeholder (C-COND-2); live value via deferred ADR
             agent_run_id=f"mock-{seed[16:28]}",
             model_deployment=None,
-            prompt_version=None,
+            prompt_version=prompt_template_version,
+            prompt_template_id=prompt_template_id,
+            prompt_template_version=prompt_template_version,
+            model_or_agent_ref=None,  # null under the deterministic mock
+            warnings=[],
+            safe_error=None,
             token_usage=TokenUsage(prompt=0, completion=0),
             latency_ms=0,
         )

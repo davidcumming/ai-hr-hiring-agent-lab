@@ -153,7 +153,27 @@
     "/api/evaluations": {
       "post": {
         "description": "Advisory-only: every result carries decision_support_only=true and human_review_required=true. Business outcomes (completed | blocked | validation_failed) return HTTP 200 with the status in the envelope; malformed bodies return HTTP 400; missing identity 401; authenticated callers without the 'hr' role 403 (envelope status 'unauthorized'). Envelope statuses 'needs_input' and 'error' are reserved and never emitted by this slice.",
-        "operationId": "post_evaluation_api_evaluations_post",
+        "operationId": "submitEvaluation",
+        "parameters": [
+          {
+            "description": "Idempotency key for the submission. Equivalent to the body field 'idempotency_key'; provide either (or both with identical values \u2014 a mismatch is rejected with HTTP 400). Replays with the same key return the original result without re-running the council.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional caller-supplied correlation id, echoed on the response. The server-assigned correlation id of the evaluation is returned in the response envelope and in this response header.",
+            "in": "header",
+            "name": "X-Correlation-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -195,9 +215,16 @@
                     "title": "Evaluation Question"
                   },
                   "idempotency_key": {
-                    "minLength": 1,
-                    "title": "Idempotency Key",
-                    "type": "string"
+                    "anyOf": [
+                      {
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Idempotency Key"
                   },
                   "position_id": {
                     "minLength": 1,
@@ -233,8 +260,7 @@
                   }
                 },
                 "required": [
-                  "position_id",
-                  "idempotency_key"
+                  "position_id"
                 ],
                 "title": "EvaluationRequest",
                 "type": "object"
@@ -261,7 +287,7 @@
     "/api/evaluations/{evaluation_id}": {
       "get": {
         "description": "Returns the persisted full audit record (every intermediate council output, rigor resolution, triggers, gate results, actor identity and role context) wrapped in the standard envelope. Requires the 'hr' role.",
-        "operationId": "get_evaluation_api_evaluations__evaluation_id__get",
+        "operationId": "getEvaluation",
         "parameters": [
           {
             "in": "path",
@@ -269,6 +295,15 @@
             "required": true,
             "schema": {
               "title": "Evaluation Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional caller-supplied correlation id, echoed on the response. The server-assigned correlation id of the evaluation is returned in the response envelope and in this response header.",
+            "in": "header",
+            "name": "X-Correlation-Id",
+            "required": false,
+            "schema": {
               "type": "string"
             }
           }

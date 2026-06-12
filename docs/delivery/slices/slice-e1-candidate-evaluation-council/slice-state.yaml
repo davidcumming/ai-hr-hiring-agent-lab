@@ -48,7 +48,50 @@ slice_id: slice-e1-candidate-evaluation-council
 # (live eval = documented deferral; eval summary), formal Stage 12/13 confirmation if
 # required, then the Stage 16 HUMAN gate (closeout/merge approval). Nothing has been
 # merged; no issues created.
-current_stage: 9
+#
+# 2026-06-11 — AZURE/FOUNDRY READINESS-PACK CODING BATCH (Stages 5-14 partial,
+# run on the uncommitted working tree on main; all behaviour local/deterministic
+# by default; no Azure resources, no live Foundry/model calls, no secrets):
+#   Stage 5  — implementation-plan-readiness-pack.md (coding targets T1-T9).
+#   Stage 6  — architecture-check-readiness-pack.md: verdict CLEAR; prompt registry
+#              resolved as source-controlled config (no new ADR); G-001 deferred ADR
+#              UNCHANGED (draft, NOT approved, human gate before live wiring);
+#              provider-ID enumeration kept option-neutral (ADR question 2 input only).
+#   Stage 7  — readiness pack implemented: StorageBackend ABC + LocalFilesystemBackend
+#              (artifact tree evaluations/{id}/record.json + projections +
+#              metadata/evaluations.jsonl text-free summary rows) + AzureBlobBackend
+#              fail-closed scaffold; provider registry (deterministic_mock default |
+#              3 foundry_* fail-closed scaffolds) + HRHA_ENABLE_LIVE_AZURE /
+#              HRHA_PROVIDER_KILL_SWITCH guards; versioned prompt registry (10 roles,
+#              recorded-not-executed, provenance stamped into ProviderMetadata);
+#              CouncilRoleInvocation transcripts; OpenAPI operation IDs
+#              submitEvaluation/getEvaluation + Idempotency-Key / X-Correlation-Id
+#              headers; scripts/run_council_local.py + double-guarded smoke scaffolds;
+#              infra/ placeholder skeleton (never deployed); config samples.
+#   Stage 8  — RP-001..RP-015 deterministic tests added (tests/test_rp001..rp005).
+#   Stage 9  — source-control-config-capture.md; implementation-deviations.md
+#              (DEV-R01..R08; all Low; no compliance flags).
+#   Stage 10/11 — eval-summary-readiness-pack.md (fresh subagent): live evals NOT run
+#              (documented deferral unchanged); suite 147 passed / 7 skipped (LE-001..7
+#              deferral stubs) / 0 failed; OpenAPI drift clean; CLI demo verified.
+#   Stage 12 — current-state/architecture/integration docs reconciled (fresh subagent);
+#              created azure-lab-wiring-tomorrow.md, cloud-readiness-notes.md,
+#              implementation-notes.md; copilot-studio-tool-readiness.md added.
+#   Stage 13 — doc-validation-readiness-pack.md (fresh isolated validator): initial
+#              FAIL (BM-001 storage-backend selection not wired into create_app;
+#              BM-002 correlation-header overclaim); fix loop applied (code fix +
+#              pinning test for BM-001 = DEV-R08; wording fixes for BM-002/NB-001..4);
+#              delta re-validation (second fresh validator): CONDITIONAL-PASS;
+#              surviving NB-002-R wording fix applied post-validation.
+#   Stage 14 (partial) — traceability-readiness-pack.md: 25 covered / 1 partial
+#              (AC-015 human half) / 2 untested-pending-human (AC-019, AC-020) /
+#              1 untestable-by-design (T8) / 11 deferred (LE-001..7, deferred ADR,
+#              BQ-005, live storage/provider wiring); 5 draft issue candidates —
+#              NO issues created; NO closeout package; NO DoD final run; NO merge.
+# Next: HUMAN gates — review/commit to a reviewable branch, approve issue creation,
+# full Stage 14-16 closeout (incl. AC-015 human review, AC-019 PO review, AC-020 CI
+# evidence), and the deferred Foundry-wiring ADR + BQ-005 before any live wiring.
+current_stage: 14   # partial — traceability only; closeout/DoD/merge pending human gates
 
 sizing:
   decision: accept-as-one-slice
@@ -105,13 +148,20 @@ artifacts:
   deviation_log: docs/delivery/slices/slice-e1-candidate-evaluation-council/deviation-log.md
   implementation: src/hr_eval_lab/ (+ fixtures/, config/, openapi/, scripts/, .github/workflows/ci.yml)
   deterministic_tests: tests/ (DT-001..DT-018 + smoke; live_evals/ LE stubs)
-  eval_summary: null
+  eval_summary: docs/delivery/slices/slice-e1-candidate-evaluation-council/eval-summary-readiness-pack.md   # deterministic-only; live evals deferred (documented)
   closeout_package: null
-  traceability_matrix: null
+  traceability_matrix: docs/delivery/slices/slice-e1-candidate-evaluation-council/traceability-readiness-pack.md   # partial Stage 14; full closeout pending
+  implementation_plan_readiness_pack: docs/delivery/slices/slice-e1-candidate-evaluation-council/implementation-plan-readiness-pack.md
+  architecture_check_readiness_pack: docs/delivery/slices/slice-e1-candidate-evaluation-council/architecture-check-readiness-pack.md
+  implementation_deviations_readiness_pack: docs/delivery/slices/slice-e1-candidate-evaluation-council/implementation-deviations.md
+  source_control_config_capture: docs/delivery/slices/slice-e1-candidate-evaluation-council/source-control-config-capture.md
+  doc_validation_readiness_pack: docs/delivery/slices/slice-e1-candidate-evaluation-council/doc-validation-readiness-pack.md
+  cloud_readiness_notes: docs/delivery/slices/slice-e1-candidate-evaluation-council/cloud-readiness-notes.md
+  implementation_notes_readiness_pack: docs/delivery/slices/slice-e1-candidate-evaluation-council/implementation-notes.md
   documentation_catchup: docs/delivery/slices/slice-e1-candidate-evaluation-council/documentation-catchup-current-state.md
   doc_validation_current_state_baseline: docs/delivery/slices/slice-e1-candidate-evaluation-council/doc-validation-current-state-baseline.md
   current_state_docs: docs/product-current-state/ (README.md, candidate-evaluation-council.md)
   architecture_docs: docs/architecture/ (actual-technical-architecture.md, candidate-evaluation-council-architecture.md, provider-and-storage-seams.md)
-  integration_docs: docs/integration/README.md
+  integration_docs: docs/integration/ (README.md, copilot-studio-tool-readiness.md, azure-lab-wiring-tomorrow.md)
 
 updated_at: 2026-06-11

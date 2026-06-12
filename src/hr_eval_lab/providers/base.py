@@ -40,15 +40,10 @@ class CouncilProvider(ABC):
 
 
 def select_provider(config: LabConfig) -> CouncilProvider:
-    """Resolve the configured backend. Lazy: the Foundry stub module is only
-    imported when explicitly configured (and even then raises on use)."""
-    backend = config.provider.ai_backend_type
-    if backend == "none":
-        from hr_eval_lab.providers.mock import DeterministicMockProvider
+    """Resolve the configured backend via the provider registry (readiness
+    pack). Lazy: the default path imports only the deterministic mock; Foundry
+    modules are imported only when explicitly configured — and even then the
+    scaffolds fail closed (kill switch / live-enable guards apply)."""
+    from hr_eval_lab.providers.registry import resolve_provider
 
-        return DeterministicMockProvider()
-    if backend == "foundry_agents":
-        from hr_eval_lab.providers.foundry_stub import FoundryAgentProvider
-
-        return FoundryAgentProvider()
-    raise ValueError(f"unknown ai_backend_type: {backend}")  # unreachable via config validation
+    return resolve_provider(config)

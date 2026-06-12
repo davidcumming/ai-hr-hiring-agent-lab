@@ -55,7 +55,8 @@ def test_flags_invariant_across_completed_blocked_and_escalated(make_client):
     scanned = 0
     for client in (completed_client, blocked_client, escalated_client):
         store = client.app.state.store
-        for blob in sorted((store.root / "evaluations").iterdir()):
+        # Readiness-pack layout: evaluations/{evaluation_id}/record.json
+        for blob in sorted((store.root / "evaluations").glob("*/record.json")):
             record = json.loads(blob.read_text(encoding="utf-8"))
             scanned += 1
             assert record["human_review"]["human_review_required"] is True

@@ -1,4 +1,4 @@
-# Server-side, source-controlled lab configuration (slice-e1).
+# Server-side, source-controlled lab configuration (slice-e1 + readiness pack).
 # Git history is the change record (slice spec §17). No secrets exist in this
 # file or anywhere in the repo. Tests exercise non-default states by
 # constructing the app with an explicit config object, never by editing this
@@ -13,10 +13,29 @@ default_mode = "high_impact"
 policy = "record_only"
 
 [provider]
-# none | foundry_agents  ("foundry_agents" selects the non-functional seam stub
-# which raises ProviderNotConfiguredError on any use; live wiring is deferred)
+# Readiness provider registry:
+#   deterministic_mock (default, the only functional provider)
+#   foundry_project_responses | foundry_prompt_agent | foundry_hosted_agent
+#     (scaffold-only; fail closed; blocked by HRHA_PROVIDER_KILL_SWITCH=true
+#      and by HRHA_ENABLE_LIVE_AZURE unset/false; live wiring is human-gated
+#      by the deferred ADR — these IDs decide nothing)
+provider_id = "deterministic_mock"
+# Legacy family value kept for audit-record compatibility; must agree with
+# provider_id (none <-> deterministic_mock; foundry_agents <-> foundry_*).
 ai_backend_type = "none"
 
 [persistence]
 # Local store root (gitignored). Overridable via explicit config object in tests.
 root = "var/lab-data"
+
+[storage]
+# local_filesystem (default) | azure_blob (scaffold-only; fails closed with a
+# configuration error unless fully configured AND HRHA_ENABLE_LIVE_AZURE=true)
+backend = "local_filesystem"
+
+[storage.azure]
+# PLACEHOLDERS ONLY — empty by default; identity-based auth intended for the
+# live path (no connection strings, keys, or SAS tokens, ever).
+account_url = ""
+container = ""
+table_endpoint = ""

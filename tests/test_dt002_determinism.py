@@ -55,6 +55,7 @@ def test_persisted_blob_is_canonical_json(make_client):
     response = post_evaluation(client, idempotency_key="dt002-canonical")
     evaluation_id = response.json()["evaluation_id"]
     store = client.app.state.store
-    blob_path = store.root / "evaluations" / f"{evaluation_id}.json"
+    # Readiness-pack layout: evaluations/{evaluation_id}/record.json
+    blob_path = store.root / "evaluations" / evaluation_id / "record.json"
     raw = blob_path.read_text(encoding="utf-8")
     assert raw == canonical_json(json.loads(raw))

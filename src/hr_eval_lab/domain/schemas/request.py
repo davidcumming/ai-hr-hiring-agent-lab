@@ -22,7 +22,10 @@ class EvaluationRequest(BaseModel):
     candidate_ref: Optional[str] = None
     resume_text: Optional[str] = None
     cover_letter_text: Optional[str] = None
-    idempotency_key: str = Field(min_length=1)
+    # Optional in the schema since the readiness pack also accepts the
+    # Idempotency-Key request header; the facade enforces that one of the two
+    # is present (HTTP 400 otherwise) and that both agree when both are given.
+    idempotency_key: Optional[str] = Field(default=None, min_length=1)
     evaluation_question: Optional[str] = None
     requested_rigor: Optional[RigorMode] = None
 

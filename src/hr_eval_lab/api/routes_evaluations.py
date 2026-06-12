@@ -40,6 +40,45 @@ router = APIRouter()
 
 _REQUEST_BODY_SCHEMA = EvaluationRequest.model_json_schema()
 
+#: Readiness-pack header contract (documented in OpenAPI for tool registration).
+IDEMPOTENCY_KEY_HEADER = "Idempotency-Key"
+CORRELATION_ID_HEADER = "X-Correlation-Id"
+
+_HEADER_PARAMS_POST = [
+    {
+        "name": IDEMPOTENCY_KEY_HEADER,
+        "in": "header",
+        "required": False,
+        "schema": {"type": "string"},
+        "description": (
+            "Idempotency key for the submission. Equivalent to the body field "
+            "'idempotency_key'; provide either (or both with identical values "
+            "— a mismatch is rejected with HTTP 400). Replays with the same "
+            "key return the original result without re-running the council."
+        ),
+    },
+    {
+        "name": CORRELATION_ID_HEADER,
+        "in": "header",
+        "required": False,
+        "schema": {"type": "string"},
+        "description": (
+            "Optional caller-supplied correlation id, echoed on the response. "
+            "The server-assigned correlation id of the evaluation is returned "
+            "in the response envelope and in this response header."
+        ),
+    },
+]
+
+_HEADER_PARAMS_GET = [_HEADER_PARAMS_POST[1]]
+
+
+def _set_correlation_header(request: Request, envelope: Envelope) -> Envelope:
+    """Expose the envelope's correlation id to the response-header middleware."""
+    if envelope.correlation_id:
+        request.state.correlation_id = envelope.correlation_id
+    return envelope
+
 
 def _record_envelope(record: dict, replayed: bool = False) -> Envelope:
     """Build the POST envelope from a (possibly stored) full record."""
@@ -72,11 +111,13 @@ def _record_envelope(record: dict, replayed: bool = False) -> Envelope:
 @router.post(
     "/api/evaluations",
     response_model=Envelope,
+    operation_id="submitEvaluation",
     openapi_extra={
         "requestBody": {
             "required": True,
             "content": {"application/json": {"schema": _REQUEST_BODY_SCHEMA}},
-        }
+        },
+        "parameters": _HEADER_PARAMS_POST,
     },
     summary="Submit one candidate evaluation to the Calibrated Evaluation Council",
     description=(
@@ -109,6 +150,23 @@ async def post_evaluation(request: Request) -> Envelope:
         )
         raise MalformedBodyError(f"invalid request shape: {fields}")
 
+    # Idempotency key: body field or Idempotency-Key header (readiness pack).
+    header_key = request.headers.get(IDEMPOTENCY_KEY_HEADER)
+    if (
+        header_key
+        and eval_request.idempotency_key
+        and header_key != eval_request.idempotency_key
+    ):
+        raise MalformedBodyError(
+            "Idempotency-Key header and body idempotency_key disagree"
+        )
+    idempotency_key = eval_request.idempotency_key or header_key
+    if not idempotency_key:
+        raise MalformedBodyError(
+            "an idempotency key is required: body field 'idempotency_key' or "
+            "Idempotency-Key header"
+        )
+
     store = state.store
     fixtures = state.fixtures
 
@@ -132,7 +190,7 @@ async def post_evaluation(request: Request) -> Envelope:
 
     # 4. Idempotency (replay -> stored result, zero council execution).
     fingerprint = idempotency.request_fingerprint(body)
-    existing = idempotency.lookup(store, eval_request.idempotency_key)
+    existing = idempotency.lookup(store, idempotency_key)
     if existing is not None:
         if existing.request_fingerprint != fingerprint:
             return Envelope(
@@ -146,7 +204,7 @@ async def post_evaluation(request: Request) -> Envelope:
             "idempotent replay evaluation_id=%s key_fingerprint_match=true",
             existing.evaluation_id,
         )
-        return _record_envelope(stored, replayed=True)
+        return _set_correlation_header(request, _record_envelope(stored, replayed=True))
 
     # 5. Source resolution + sha256 verification (mismatch -> blocked).
     try:
@@ -194,17 +252,21 @@ async def post_evaluation(request: Request) -> Envelope:
     store.save_record(record)
     idempotency.record(
         store,
-        idempotency_key=eval_request.idempotency_key,
+        idempotency_key=idempotency_key,
         evaluation_id=evaluation_id,
         fingerprint=fingerprint,
         created_at=created_at,
     )
-    return _record_envelope(record.model_dump(mode="json"))
+    return _set_correlation_header(
+        request, _record_envelope(record.model_dump(mode="json"))
+    )
 
 
 @router.get(
     "/api/evaluations/{evaluation_id}",
     response_model=Envelope,
+    operation_id="getEvaluation",
+    openapi_extra={"parameters": _HEADER_PARAMS_GET},
     summary="Retrieve the full audit record for one evaluation",
     description=(
         "Returns the persisted full audit record (every intermediate council "
@@ -224,13 +286,16 @@ async def get_evaluation(evaluation_id: str, request: Request) -> Envelope:
             safe_details=f"no record exists for evaluation_id '{evaluation_id}'",
             errors=["unknown_evaluation_id"],
         )
-    return Envelope(
-        status="completed",
-        evaluation_id=evaluation_id,
-        correlation_id=record.get("correlation_id"),
-        user_message=(
-            "Full audit record retrieved. The contained evaluation is advisory "
-            "decision support and requires human review."
+    return _set_correlation_header(
+        request,
+        Envelope(
+            status="completed",
+            evaluation_id=evaluation_id,
+            correlation_id=record.get("correlation_id"),
+            user_message=(
+                "Full audit record retrieved. The contained evaluation is advisory "
+                "decision support and requires human review."
+            ),
+            result=record,
         ),
-        result=record,
     )

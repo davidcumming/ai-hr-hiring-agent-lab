@@ -13,24 +13,40 @@ lab**: a FastAPI service (`src/hr_eval_lab/`) that accepts a single synthetic
 candidate evaluation request, runs an 11-role "Calibrated Evaluation Council"
 pipeline against an evidence packet built from hash-verified fixture (or
 inline synthetic) documents, applies deterministic quality gates, and persists
-a complete audit record locally. All AI-role outputs currently come from a
-**deterministic mock provider** (`ai_backend_type = "none"`); no live model,
-no Azure resource, no network call is involved anywhere in the runtime path.
+a complete audit record — plus per-artifact projections (request, source
+documents, evidence packet, per-role council transcripts, synthesis, gates,
+provider metadata, human review) and a text-free summary row — locally
+through a formal storage-backend seam. All AI-role outputs come from a
+**deterministic mock provider** (provider id `deterministic_mock`); no live
+model, no Azure resource, no network call is involved anywhere in the runtime
+path.
+
+Azure/Foundry-facing surfaces exist only as **fail-closed, non-functional
+scaffolds**: the three Foundry provider scaffolds and the Azure Blob storage
+backend scaffold raise safe configuration errors on any use (selection is
+additionally blocked by the server-side environment guards
+`HRHA_ENABLE_LIVE_AZURE` and `HRHA_PROVIDER_KILL_SWITCH`); the smoke-test
+scripts are double-guarded and skip all live work by default; the `infra/`
+skeleton is placeholder documentation only and executes nothing. Live wiring
+remains deferred and human-gated. A versioned, source-controlled prompt
+registry (`src/hr_eval_lab/prompts/`) records prompt provenance into every
+audit record; templates are never executed.
 
 Every result is advisory decision support: `decision_support_only = true` and
 `human_review_required = true` are structurally enforced (`Literal[True]`
 fields in `src/hr_eval_lab/domain/schemas/evaluation.py`), and every
 evaluation produces a human-review queue entry.
 
-A deterministic test suite (`tests/`, DT-001…DT-018 plus a smoke test) covers
-the behavior described here: 88 tests pass, 7 live-eval stubs skip with a
-documented deferral rationale (verified run, 2026-06-11).
+A deterministic test suite (`tests/`, DT-001…DT-018 plus a smoke test and the
+RP storage/provider/prompt/contract suite) covers the behavior described
+here: 146 tests pass, 7 live-eval stubs skip with a documented deferral
+rationale, 0 fail (verified run, 2026-06-11).
 
 ## Documents in this folder
 
 | Document | Contents |
 |---|---|
-| [`candidate-evaluation-council.md`](./candidate-evaluation-council.md) | The full behavior reference: API endpoints, envelope and error model, simulated auth, council orchestration and modes, rigor and escalation, quality gates, evidence packet, persistence and audit record, idempotency, review queue, CLI, configuration surface, fixtures, logging guarantees, and limitations. |
+| [`candidate-evaluation-council.md`](./candidate-evaluation-council.md) | The full behavior reference: API endpoints (operation IDs, idempotency/correlation headers), envelope and error model, simulated auth, council orchestration and modes, rigor and escalation, quality gates, evidence packet, persistence (artifact tree, summary rows, storage-backend seam) and audit record, idempotency, review queue, CLI and local scripts, configuration surface and environment guards, prompt registry, fixtures, logging guarantees, and limitations. |
 
 ## How these docs relate to other documentation
 
@@ -48,8 +64,12 @@ documented deferral rationale (verified run, 2026-06-11).
   record intent and delivery history; when they disagree with code, tests, or
   these current-state docs, the code and tests win.
 - **Integration:** [`../integration/README.md`](../integration/README.md)
-  records that **no live integration exists** — only in-code seams and a
-  deferred, unapproved ADR stub.
+  records that **no live integration exists** — only in-code seams,
+  fail-closed scaffolds, and a deferred, unapproved ADR draft.
+  [`../integration/copilot-studio-tool-readiness.md`](../integration/copilot-studio-tool-readiness.md)
+  records what the implemented API contract already provides for a future
+  Copilot Studio tool registration (documentation only; no portal
+  configuration exists).
 
 ## Maintenance rule
 

@@ -84,6 +84,11 @@ exactly **one** corrective retry with a `corrective_hint` in the role context
 fails the run; no coercion). Every invocation increments the run's provider
 invocation counter, persisted as `provider_invocation_count`.
 
+Under the deterministic mock, every model-role invocation's
+`ProviderMetadata` carries the role's prompt-registry template provenance
+(`prompt_template_id` / `prompt_template_version` from
+`prompts/registry.py`); the templates themselves are never executed.
+
 ## 3. Code roles (`council/code_roles.py`)
 
 Deterministic, facade-owned, zero provider calls; outputs recorded in the
@@ -127,5 +132,26 @@ provider, and the mock-parity tests (DT-013):
   `role_schema_version` per invocation and as the `schema_version` of every
   model-role execution row.
 
+`ProviderMetadata` additionally carries nullable provenance/diagnostic
+fields — `prompt_template_id`, `prompt_template_version`,
+`model_or_agent_ref`, `safe_error` (safe category only; never a raw provider
+error) and a `warnings` list — populated deterministically (template
+provenance) or null/empty under the mock.
+
 Together with `RECORD_SCHEMA_VERSION = "1.0"` (audit record), these make any
 future contract drift visible in persisted data rather than silent.
+
+## 6. Persisted per-role transcripts
+
+At persistence time, every recorded role execution is projected into a
+discrete transcript artifact
+`evaluations/{evaluation_id}/council/{role}.json` — a
+`CouncilRoleInvocation` (`domain/schemas/transcript.py`): role, kind,
+sequence index, prompt template id/version, input artifact refs, the
+validated output JSON, validation status
+(`valid | valid_after_retry | invalid`), provider trace metadata, token
+usage, latency, warnings, and safe error. The transcript is a **projection
+of the audit record** (the single source of truth) built by
+`build_role_invocation()`; it never contains raw prompts, hidden
+instructions, raw provider errors, secrets, or stack traces. Persistence
+layout detail: [`provider-and-storage-seams.md`](./provider-and-storage-seams.md) §2.
