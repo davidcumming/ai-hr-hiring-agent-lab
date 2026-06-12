@@ -257,8 +257,10 @@ with a different fingerprint returns `validation_failed`
 
 Persistence runs through a formal storage seam: `LocalStore`
 (`persistence/store.py`) delegates record and artifact I/O to a
-`StorageBackend` (`persistence/backend.py`); the active backend is
-`LocalFilesystemBackend`. Writes are append-only under the configured local
+`StorageBackend` (`persistence/backend.py`). The normal local backend is
+`LocalFilesystemBackend`; the Azure Functions wrapper can explicitly overlay
+`AzureBlobBackend` from Function App settings for hosted Blob-backed audit
+record durability. Local writes are append-only under the configured local
 root (default `var/lab-data/`, gitignored):
 
 - **Full audit record** `evaluations/{evaluation_id}/record.json` —
@@ -292,13 +294,22 @@ root (default `var/lab-data/`, gitignored):
   hashes, sizes, counters, flags, actor/role/correlation properties),
   `IdempotencyRecords.jsonl`, and `ReviewQueue.jsonl`.
 
-A second backend, `AzureBlobBackend`
-(`persistence/azure_blob_backend.py`), exists as a **non-functional,
-fail-closed scaffold**: it imports no Azure SDK, performs no network I/O,
-refuses construction unless fully configured **and**
-`HRHA_ENABLE_LIVE_AZURE=true`, and raises `StorageNotConfiguredError` on
-every operation even then. Live Azure storage wiring is deferred and
-human-gated.
+The second backend, `AzureBlobBackend`
+(`persistence/azure_blob_backend.py`), is functional only when explicitly
+selected and `HRHA_ENABLE_AZURE_STORAGE=true`. It writes the full record and
+artifact projections as block blobs under
+`evaluations/{evaluation_id}/...`, reads the full record by evaluation id,
+and stores a Blob-only compatibility summary under
+`metadata/evaluations/{evaluation_id}.json`. It imports no Azure SDK on the
+local default path; SDK imports are lazy after storage config validation.
+Authentication is identity-based only (managed identity in Azure, explicit
+developer credential only for a live-storage smoke path). Connection strings,
+account keys, SAS tokens, and SAS-in-URL query strings are rejected.
+
+E3 boundary: hosted POST-then-GET durability is provided for the full
+evaluation audit record. Idempotency rows, evidence JSONL rows, review queue
+rows, and Azure Table Storage system-of-record behavior remain local/deferred
+unless a later slice implements Table-backed persistence.
 
 ## 12. Review queue
 
@@ -352,22 +363,31 @@ the response envelope to stdout.
 | `provider.ai_backend_type` | `none \| foundry_agents` (legacy family value; must agree with `provider_id` — mismatch is a config error) | `none` |
 | `persistence.root` | path | `var/lab-data` |
 | `storage.backend` | `local_filesystem \| azure_blob` | `local_filesystem` |
-| `storage.azure.account_url` / `.container` / `.table_endpoint` | placeholder strings | empty (placeholders) |
+| `storage.azure.account_url` / `.container` / `.table_endpoint` | placeholder strings (`table_endpoint` optional for E3) | empty (placeholders) |
 
-Two server-side environment guards exist (read at resolution time, never
-stored in records, never reachable from request bodies):
+Server-side environment guards exist (read at resolution time, never stored in
+records, never reachable from request bodies):
 
 - `HRHA_ENABLE_LIVE_AZURE` — anything other than `"true"` (case-insensitive,
-  whitespace-trimmed; unset is the default) disables every live Azure/Foundry
-  path.
+  whitespace-trimmed; unset is the default) keeps live Foundry/provider paths
+  disabled.
 - `HRHA_PROVIDER_KILL_SWITCH` — `"true"` blocks every Foundry provider,
   independent of all other configuration.
+- `HRHA_ENABLE_AZURE_STORAGE` — `"true"` is required before the explicitly
+  selected `azure_blob` backend can construct. This narrower storage gate does
+  not enable Foundry/model calls.
+- `HRHA_STORAGE_BACKEND` plus `HRHA_STORAGE_ACCOUNT_URL` and
+  `HRHA_STORAGE_CONTAINER` are overlaid only by `function_app.py` (or an
+  explicit live-storage smoke path). Ordinary local `create_app()` /
+  `load_config()` ignores ambient storage env vars and remains local.
 
-Selecting any `foundry_*` provider or the `azure_blob` backend yields only a
-**fail-closed scaffold**: the provider registry refuses Foundry IDs while the
-guards are closed, and even past the guards every scaffold raises
-(`ProviderNotConfiguredError` / `StorageNotConfiguredError`). **There is no
-configuration value that produces a live model call or a live Azure call.**
+Selecting any `foundry_*` provider yields only a **fail-closed scaffold**:
+the provider registry refuses Foundry IDs while the guards are closed, and
+even past the guards every provider scaffold raises
+`ProviderNotConfiguredError`. **There is no configuration value that produces
+a live model call.** The Azure Blob storage backend is the only live Azure
+SDK-backed path and is limited to Blob persistence for evaluation records and
+artifacts.
 No secrets exist in the repository. Source-controlled samples (placeholders
 only): `config/azure.env.sample`, `config/role-agent-mapping.sample.json`.
 
@@ -396,7 +416,7 @@ carries prompt provenance without any prompt being sent anywhere.
 | Script | Behavior |
 |---|---|
 | `scripts/run_council_local.py` | Local deterministic council demo: runs one synthetic candidate (`cand-sample-001` / `pos-sample-001`) strictly through the in-process HTTP facade (no privileged side door), writes the artifact tree under a demo data root, and prints a **safe summary only** — identifiers, statuses, counts, artifact names/hashes; never resume text, prompts, or model I/O. |
-| `scripts/smoke_storage_config.py` | Disabled-by-default storage-config smoke scaffold. Default path: reports placeholder status, sanity-checks the local filesystem backend in a temp dir, exits 0 with a SKIPPED message. The live path requires **both** `HRHA_ENABLE_LIVE_AZURE=true` and `--live`, and then fails safely (clear config error, exit 2) — live checks are not implemented. No SDK import, no network in the default path. |
+| `scripts/smoke_storage_config.py` | Disabled-by-default storage-config smoke. Default path sanity-checks the local filesystem backend in a temp dir, exits 0 with a SKIPPED message, imports no Azure SDK, and performs no network I/O. The explicit live-storage config path requires **both** `HRHA_ENABLE_AZURE_STORAGE=true` and `--live`, validates `HRHA_STORAGE_BACKEND=azure_blob` plus Blob account URL/container, and does not require Table Storage for E3. Hosted POST/GET is the connectivity smoke. |
 | `scripts/smoke_foundry_config.py` | Same double-guarded pattern for Foundry configuration: default path reports guard/placeholder status and exits 0 SKIPPED; the live path fails safely — live checks are not implemented. |
 | `scripts/export_openapi.py` | Regenerates/drift-checks `openapi/evaluations-api.json`. |
 | `scripts/vendor_fixtures.py` | Dev-time fixture vendoring/hash refresh. |
@@ -455,9 +475,11 @@ script's stdout is test-verified to contain no resume or prompt text.
 - **No live AI backend.** All judgment content is produced by the
   deterministic mock (keyword-matching against rubric anchors); recommendation
   labels and confidence values are mechanical, not model judgments. Every
-  result's limitations list says so. The Foundry provider scaffolds and the
-  Azure Blob storage scaffold are non-functional placeholders; live wiring is
-  deferred and human-gated (unapproved ADR draft + BQ-005 region approval).
+  result's limitations list says so. The Foundry provider scaffolds are
+  non-functional placeholders; live model wiring is deferred and human-gated
+  (unapproved ADR draft + BQ-005 region approval). Azure Blob storage is the
+  narrow exception for E3 record/artifact durability and does not enable any
+  live AI behavior.
 - **Prompt templates are provenance only.** No prompt is ever executed; the
   registry exists so the audit trail and the future live backend share one
   versioned prompt source.

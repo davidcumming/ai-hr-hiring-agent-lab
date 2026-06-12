@@ -16,6 +16,7 @@ from pathlib import Path
 import pytest
 
 from tests.conftest import REPO_ROOT
+from tests.fake_blob import FakeBlobContainerClient
 
 HOST_PATH = REPO_ROOT / "host.json"
 FUNCIGNORE_PATH = REPO_ROOT / ".funcignore"
@@ -31,6 +32,7 @@ REQUIRED_EXCLUDES = {
     ".ruff_cache/",
     ".local/",
     "var/",
+    ".deploy/",
     ".coverage",
     ".coverage.*",
     "coverage.xml",
@@ -52,6 +54,15 @@ REQUIRED_RUNTIME_PATHS = {
     "openapi/evaluations-api.json",
 }
 
+STORAGE_ENV_NAMES = (
+    "HRHA_STORAGE_BACKEND",
+    "HRHA_ENABLE_AZURE_STORAGE",
+    "HRHA_STORAGE_ACCOUNT_URL",
+    "HRHA_STORAGE_CONTAINER",
+    "HRHA_STORAGE_TABLE_ENDPOINT",
+    "HRHA_MANAGED_IDENTITY_CLIENT_ID",
+)
+
 
 def _clear_function_app_modules() -> None:
     for name in list(sys.modules):
@@ -65,7 +76,9 @@ def _load_function_app_module():
 
 
 @pytest.fixture()
-def function_app_module():
+def function_app_module(monkeypatch):
+    for name in STORAGE_ENV_NAMES:
+        monkeypatch.delenv(name, raising=False)
     module = _load_function_app_module()
     try:
         yield module
@@ -119,6 +132,34 @@ def test_function_app_defaults_remain_deterministic_and_non_live(function_app_mo
     assert config.provider.ai_backend_type == "none"
     assert config.storage.backend == "local_filesystem"
     assert config.persistence.root != "var/lab-data"
+
+
+def test_function_app_applies_storage_env_overlay_only_in_wrapper(monkeypatch):
+    from hr_eval_lab.persistence import azure_blob_backend
+
+    fake = FakeBlobContainerClient()
+    monkeypatch.setattr(
+        azure_blob_backend, "_blob_container_client_factory", lambda azure: fake
+    )
+    monkeypatch.setenv("HRHA_STORAGE_BACKEND", "azure_blob")
+    monkeypatch.setenv("HRHA_ENABLE_AZURE_STORAGE", "true")
+    monkeypatch.setenv(
+        "HRHA_STORAGE_ACCOUNT_URL", "https://placeholder.blob.core.windows.net"
+    )
+    monkeypatch.setenv("HRHA_STORAGE_CONTAINER", "placeholder")
+    monkeypatch.delenv("HRHA_STORAGE_TABLE_ENDPOINT", raising=False)
+
+    module = _load_function_app_module()
+    try:
+        config = module.fastapi_app.state.config
+        assert config.provider.provider_id == "deterministic_mock"
+        assert config.provider.ai_backend_type == "none"
+        assert config.storage.backend == "azure_blob"
+        assert config.storage.azure.container == "placeholder"
+        assert config.storage.azure.table_endpoint == ""
+        assert type(module.fastapi_app.state.store.backend).__name__ == "AzureBlobBackend"
+    finally:
+        _clear_function_app_modules()
 
 
 def test_funcignore_excludes_local_state_but_keeps_runtime_paths():

@@ -8,9 +8,11 @@ committed.** Real values arrive through an approved channel at wiring time.
 
 ## 0. Human gates that must pass FIRST
 
-No live-storage or Foundry value below may be acted on — no resource created,
-no setting flipped to live mode, no live storage/Foundry call attempted —
-until **both** of these human gates pass:
+No Foundry value below may be acted on — no Foundry setting flipped to live
+mode and no Foundry/model call attempted — until **both** of these human gates
+pass. Slice E3's Azure Blob storage path is the narrow exception for
+already-created lab resources: it is storage-only, deterministic/mock-backed,
+and still requires explicit app settings plus identity-based auth.
 
 1. **Foundry-wiring ADR approval** —
    [`../delivery/slices/slice-e1-candidate-evaluation-council/adr-deferred-foundry-wiring.md`](../delivery/slices/slice-e1-candidate-evaluation-council/adr-deferred-foundry-wiring.md)
@@ -24,7 +26,8 @@ until **both** of these human gates pass:
 Additional standing gates: any merge, any GitHub Issue creation, any Azure
 resource creation, and residual-risk acceptance are human decisions. The
 deterministic ASGI wrapper may be published to the already-created Function
-App as a bridge smoke test only while live flags remain disabled.
+App while `HRHA_ENABLE_LIVE_AZURE=false` and `HRHA_PROVIDER_KILL_SWITCH=true`;
+Blob storage is enabled separately by `HRHA_ENABLE_AZURE_STORAGE=true`.
 
 ## 1. Azure subscription and resource group
 
@@ -36,14 +39,14 @@ App as a bridge smoke test only while live flags remain disabled.
 | Region | `<approved-canadian-region>` (e.g. `canadacentral`) | Only after BQ-005 approval (`infra/bicep/main.bicep` `location` param). |
 | Resource name prefix | `hrhalab` (sample default) | `infra/bicep/main.bicep` `namePrefix` param. |
 
-## 2. Storage (records + artifact tree + metadata tables)
+## 2. Storage (records + artifact tree now; metadata tables later)
 
 | Value | Placeholder | Maps to |
 |---|---|---|
 | Storage account name | `<storage-account>` (3–24 lowercase alphanumerics; sample `hrhalabstor`) | `infra/bicep/main.bicep`; shared-key access disabled (`allowSharedKeyAccess: false`). |
 | Blob account URL | `https://<storage-account>.blob.core.windows.net` | `config/lab-config.toml` `[storage.azure] account_url` / app setting `HRHA_STORAGE_ACCOUNT_URL`. |
 | Blob container name | `hrha-evaluations` (suggested) | `[storage.azure] container` / `HRHA_STORAGE_CONTAINER`. Blob layout mirrors the local tree: `evaluations/{evaluation_id}/record.json` + artifact projections. |
-| Table endpoint | `https://<storage-account>.table.core.windows.net` | `[storage.azure] table_endpoint` / `HRHA_STORAGE_TABLE_ENDPOINT`. Targets: summary rows (`RecordSummaryRow`, PartitionKey = evaluation id, RowKey = `summary`), evidence rows, idempotency records, review queue. |
+| Table endpoint | `https://<storage-account>.table.core.windows.net` | Optional/future for E3. It may exist in Azure as `HRHA_STORAGE_TABLE_ENDPOINT`, but Blob-only E3 does not require it. Later target: summary rows (`RecordSummaryRow`, PartitionKey = evaluation id, RowKey = `summary`), evidence rows, idempotency records, review queue. |
 
 ## 3. Facade host
 
@@ -54,10 +57,13 @@ App as a bridge smoke test only while live flags remain disabled.
 | Key Vault name | `hrhalab-kv` (sample) | For secrets that managed identity cannot eliminate; none known today. |
 
 The bridge host is root `function_app.py`, which wraps the existing FastAPI
-facade with Azure Functions. The first hosted smoke test remains
-deterministic/mock-backed and uses temporary local-filesystem persistence via
-`HRHA_PERSISTENCE_ROOT` or the process temp directory. Durable Blob/Table
-persistence is a later slice.
+facade with Azure Functions. The hosted path remains deterministic/mock-backed.
+By default it can still use temporary local-filesystem persistence via
+`HRHA_PERSISTENCE_ROOT` or the process temp directory. When the Function App
+has `HRHA_STORAGE_BACKEND=azure_blob` and `HRHA_ENABLE_AZURE_STORAGE=true`,
+the wrapper overlays Azure Blob persistence for the evaluation audit record
+and artifact projections. Complete Table-backed system-of-record behavior is
+a later slice.
 
 ## 4. Foundry (per the ADR-selected runtime shape)
 
@@ -81,44 +87,71 @@ persistence is a later slice.
 ## 6. App settings (from `config/azure.env.sample` / `infra/env.sample`)
 
 ```
-HRHA_ENABLE_LIVE_AZURE=false          # flip to true ONLY after both human gates pass
-HRHA_PROVIDER_KILL_SWITCH=false       # leave available as the emergency stop
+HRHA_ENABLE_LIVE_AZURE=false          # Foundry/model live switch; leave false for E3 Blob storage
+HRHA_PROVIDER_KILL_SWITCH=true        # keep the emergency stop on for deterministic hosted smoke
 HRHA_PERSISTENCE_ROOT=                # optional temp/writable path for hosted local_filesystem smoke state
+HRHA_STORAGE_BACKEND=azure_blob       # Function wrapper overlay only; local TOML default remains local_filesystem
+HRHA_ENABLE_AZURE_STORAGE=true        # narrow storage gate; does not enable Foundry/model calls
 HRHA_STORAGE_ACCOUNT_URL=             # https://<storage-account>.blob.core.windows.net
 HRHA_STORAGE_CONTAINER=               # hrha-evaluations
-HRHA_STORAGE_TABLE_ENDPOINT=          # https://<storage-account>.table.core.windows.net
+HRHA_STORAGE_TABLE_ENDPOINT=          # optional/future for E3
 HRHA_FOUNDRY_PROJECT_ENDPOINT=        # https://<foundry-resource>.services.ai.azure.com/api/projects/<project>
 HRHA_FOUNDRY_MODEL_DEPLOYMENT=        # <model-deployment-name>
 HRHA_FOUNDRY_AGENT_ID_PREFIX=         # <agent-id-or-prefix>
 HRHA_MANAGED_IDENTITY_CLIENT_ID=      # <managed-identity-client-id>
 ```
 
-Server-side config to flip at wiring time (`config/lab-config.toml`):
-`[provider] provider_id` to the ADR-selected shape (with the matching legacy
-`ai_backend_type = "foundry_agents"`), `[storage] backend = "azure_blob"`,
-and the `[storage.azure]` values above.
+Do not flip `config/lab-config.toml` for the deployed E3 storage path. The
+normal local FastAPI app reads the committed local defaults. The Azure
+Functions wrapper applies the storage app-setting overlay only in
+`function_app.py`. Foundry wiring later would require the ADR-selected
+provider shape plus the matching legacy `ai_backend_type = "foundry_agents"`.
 
 ## 7. First live smoke-test commands
 
-Run only after the gates pass, the values are configured, and live wiring is
-implemented (today both scripts fail safely by design — live checks are
-intentionally unimplemented):
+Storage config-only smoke for E3:
 
 ```bash
-HRHA_ENABLE_LIVE_AZURE=true python3 scripts/smoke_storage_config.py --live
-HRHA_ENABLE_LIVE_AZURE=true python3 scripts/smoke_foundry_config.py --live
+HRHA_STORAGE_BACKEND=azure_blob \
+HRHA_ENABLE_AZURE_STORAGE=true \
+HRHA_STORAGE_ACCOUNT_URL=https://<storage-account>.blob.core.windows.net \
+HRHA_STORAGE_CONTAINER=hrha-evaluations \
+python3 scripts/smoke_storage_config.py --live
 ```
 
-Both scripts are double-guarded (env flag **and** `--live`), print no
-secrets, and exit 2 with a clear configuration error rather than a stack
-trace when anything is missing. `HRHA_PROVIDER_KILL_SWITCH=true` blocks the
-Foundry check (and all Foundry providers) regardless of everything else.
+Hosted connectivity is validated by POST then GET against the Function App,
+deriving the hostname dynamically from Azure:
+
+```bash
+HOST="$(az resource show \
+  --resource-group rg-hrha-lab-cac \
+  --resource-type Microsoft.Web/sites \
+  --name func-hrha-lab-cac001 \
+  --query 'properties.defaultHostName' \
+  -o tsv)"
+
+APP_URL="https://$HOST"
+```
+
+Foundry smoke remains separately gated and disabled by default:
+
+```bash
+python3 scripts/smoke_foundry_config.py
+```
+
+Only run `HRHA_ENABLE_LIVE_AZURE=true python3 scripts/smoke_foundry_config.py --live`
+after the Foundry ADR and region/data-residency gates pass. Both smoke
+scripts print no secrets and exit 2 with a clear configuration error rather
+than a stack trace when required values are missing. `HRHA_PROVIDER_KILL_SWITCH=true`
+blocks the Foundry check and all Foundry providers regardless of everything
+else.
 
 ## 8. Out of scope for this document
 
 Real subscription IDs, tenant IDs, object IDs, client IDs, endpoints, keys,
 secrets, portal steps, and any change to the deterministic local default. The
 lab remains synthetic-data-only and advisory-only at every stage; live wiring
-does not change those invariants. Foundry, Entra auth, Copilot Studio
-registration, durable Azure Blob/Table persistence, and live Azure storage
-remain later slices.
+does not change those invariants. Foundry, live model calls, Entra auth,
+Copilot Studio registration, and complete Table-backed Azure Storage
+system-of-record behavior remain later slices. Slice E3 only makes Blob
+evaluation records/artifacts durable enough for POST then GET.

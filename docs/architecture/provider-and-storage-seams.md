@@ -1,11 +1,12 @@
 # Provider and Storage Seams
 
 Describes the replacement seams that exist **in code today**, and what
-swapping each for an Azure-backed implementation would touch. Nothing here is
-wired to any cloud service; every Azure/Foundry-shaped component is a
-fail-closed, non-functional scaffold, and the swap analysis is forward-looking
-and labeled as such. Live wiring is human-gated (deferred ADR + BQ-005 region
-approval — see §5).
+swapping each for an Azure-backed implementation would touch. After E3, the
+storage seam has one live-capable Azure path: Blob-backed evaluation
+record/artifact persistence, selected only by explicit server-side
+configuration. Foundry/provider paths remain fail-closed, non-functional
+scaffolds. Live model wiring is still human-gated (deferred ADR + BQ-005
+region approval — see §5).
 
 ## 1. Provider seam (AI backend)
 
@@ -121,8 +122,8 @@ azure_blob`; the Azure module is imported only when explicitly selected):
 
 | Backend | Status |
 |---|---|
-| `LocalFilesystemBackend` (default) | **Active — the only functional backend.** Writes the artifact-per-evaluation layout below under the local persistence root. |
-| `AzureBlobBackend` (`persistence/azure_blob_backend.py`) | **Non-functional scaffold, fail-closed.** No Azure SDK import at module import time (or in default tests), no network code, no credentials. Construction raises `StorageNotConfiguredError` unless every `[storage.azure]` value is populated **and** `HRHA_ENABLE_LIVE_AZURE=true`; even fully configured, every operation raises — live storage wiring is deferred and human-gated. Intended live auth is identity-based (managed identity / `DefaultAzureCredential`); never account keys, connection strings, or SAS tokens. |
+| `LocalFilesystemBackend` (default) | **Active local default.** Writes the artifact-per-evaluation layout below under the local persistence root. |
+| `AzureBlobBackend` (`persistence/azure_blob_backend.py`) | **Functional for Slice E3 Blob record/artifact persistence only.** No Azure SDK import at module import time or on the local default path. Construction raises `StorageNotConfiguredError` unless Blob account URL + container are configured and `HRHA_ENABLE_AZURE_STORAGE=true`; `table_endpoint` is optional because Table Storage is deferred. Auth is identity-based (managed identity in hosted Azure; `DefaultAzureCredential` only for explicit developer live-storage smoke paths). Account keys, connection strings, SAS tokens, and SAS-in-URL query strings are rejected. |
 
 Local artifact layout (mirrors the intended future blob layout so wiring is
 configuration, not restructuring):
@@ -160,15 +161,19 @@ Idempotency logic (`persistence/idempotency.py`) remains a thin layer over
 `StorageBackend` ABC, to avoid a second source of truth (a future Azure
 implementation would map the idempotency table to Azure Table directly).
 
-### What an Azure storage swap would touch (planned, not implemented)
+### Azure storage status after E3
 
-- Implement the `AzureBlobBackend` methods: artifacts become block blobs
-  under `{container}/evaluations/{evaluation_id}/...` (same names as the
-  local layout); the metadata summary becomes an Azure Table row
-  (`PartitionKey` = evaluation id, `RowKey` = `"summary"`) — the row schema
-  is already Table-shaped and text-free.
-- Map the three JSONL table-equivalents to Table Storage; idempotency lookup
-  becomes a point query on PartitionKey — same semantics.
+- Implemented: `AzureBlobBackend` methods persist the full record and artifact
+  projections as block blobs under
+  `{container}/evaluations/{evaluation_id}/...` (same names as the local
+  layout). `read_evaluation_record` retrieves `record.json` by evaluation id,
+  which is enough for hosted POST-then-GET durability.
+- Implemented as Blob compatibility, not Table Storage: `write_metadata_row`
+  writes `metadata/evaluations/{evaluation_id}.json` so the current
+  `StorageBackend` contract can complete without requiring Table Storage.
+- Deferred: map the summary row and the three JSONL table-equivalents to
+  Azure Table Storage; idempotency lookup becomes a point query on
+  PartitionKey — same semantics.
 - Byte-identity determinism (DT-002) depends on the canonical-JSON
   serialization (`backend.canonical_json`); a swap must preserve it.
 - No retention, concurrency-control, or cleanup behavior exists today; a
@@ -209,15 +214,19 @@ To prevent over-reading: there is no identity seam (auth is a single
 header-parsing function in `api/auth.py`), no queue/messaging seam (the
 review queue is a JSONL file), no eval-harness seam (live-eval stubs skip
 unconditionally), and no configuration service seam (one TOML file read at
-startup, plus the two server-side environment guards
-`HRHA_ENABLE_LIVE_AZURE` / `HRHA_PROVIDER_KILL_SWITCH`).
+startup, plus server-side environment guards and the Azure Functions
+wrapper-only storage overlay).
 
 ## 5. Live-wiring gates (status, not architecture)
 
-Live Foundry/Azure wiring is **deferred and human-gated**: the Foundry-wiring
+Live Foundry/model wiring is **deferred and human-gated**: the Foundry-wiring
 ADR
 (`docs/delivery/slices/slice-e1-candidate-evaluation-council/adr-deferred-foundry-wiring.md`)
 is a draft and NOT approved, and BQ-005 (Canadian-residency region/deployment
-approval) is pending. Until both human gates pass, every Azure/Foundry-shaped
-component in this document remains a fail-closed scaffold and no live call,
-resource creation, or token spend is possible from this codebase.
+approval) is pending. Until both human gates pass, every Foundry-shaped
+component in this document remains a fail-closed scaffold and no live model
+call, resource creation, or token spend is possible from this codebase.
+Azure Blob storage is the narrow exception: it may persist evaluation records
+and artifacts when `HRHA_STORAGE_BACKEND=azure_blob` and
+`HRHA_ENABLE_AZURE_STORAGE=true`, while `HRHA_ENABLE_LIVE_AZURE=false` and
+`HRHA_PROVIDER_KILL_SWITCH=true` continue to keep model paths disabled.

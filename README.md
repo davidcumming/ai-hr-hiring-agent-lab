@@ -26,12 +26,12 @@ The first-project policy and architecture documents are in `standards/azure-deve
 
 This checkout contains a working, fully local Candidate Evaluation Council application alongside the vendored standards:
 
-- `src/hr_eval_lab/` - FastAPI facade, 11-role council orchestration (Modes A/B/C), rigor/escalation/quality-gate logic, deterministic mock AI provider behind a provider seam, local audit-record persistence, and a thin CLI.
-- `tests/` - deterministic suite DT-001..DT-018 plus a smoke test (88 passing); `tests/live_evals/` holds deferred live-eval stubs that skip.
+- `src/hr_eval_lab/` - FastAPI facade, 11-role council orchestration (Modes A/B/C), rigor/escalation/quality-gate logic, deterministic mock AI provider behind a provider seam, local audit-record persistence, explicit Azure Blob evaluation-record persistence for the Function App path, and a thin CLI.
+- `tests/` - deterministic suite DT-001..DT-018 plus RP and smoke coverage (176 passing); `tests/live_evals/` holds deferred live-eval stubs that skip.
 - `openapi/evaluations-api.json` - the committed API contract, drift-checked against the app factory by `scripts/export_openapi.py --check`.
 - `config/lab-config.toml`, `fixtures/` (synthetic, hash-pinned), `scripts/`, and `.github/workflows/ci.yml`.
 - `docs/product-current-state/` and `docs/architecture/` - what the system does and what is physically built; `docs/delivery/slices/` - per-slice planning and delivery artifacts.
 
-There are still **no Azure resources, no live AI backend, no Copilot Studio surface, and no Entra integration** - the Foundry provider seam exists only as a non-functional stub gated behind a deferred, unapproved ADR (see `docs/integration/README.md`).
+This repo still **does not create Azure resources and has no live AI backend, no Copilot Studio surface, and no Entra integration**. The narrow Azure Blob storage path is for already-created lab resources and keeps the deterministic mock provider; the Foundry provider seam exists only as a non-functional stub gated behind a deferred, unapproved ADR (see `docs/integration/README.md`).
 
 Use the vendored process to plan further Copilot Studio, Azure AI Foundry, Azure Functions, storage, search, identity, and evaluation work as slices.

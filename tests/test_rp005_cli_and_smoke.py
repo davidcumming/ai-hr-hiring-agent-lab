@@ -15,8 +15,17 @@ SCRIPTS = REPO_ROOT / "scripts"
 
 def _run(script: str, *args: str, env_extra: dict | None = None):
     env = {**os.environ, "PYTHONPATH": str(REPO_ROOT / "src")}
-    env.pop("HRHA_ENABLE_LIVE_AZURE", None)
-    env.pop("HRHA_PROVIDER_KILL_SWITCH", None)
+    for name in (
+        "HRHA_ENABLE_LIVE_AZURE",
+        "HRHA_PROVIDER_KILL_SWITCH",
+        "HRHA_STORAGE_BACKEND",
+        "HRHA_ENABLE_AZURE_STORAGE",
+        "HRHA_STORAGE_ACCOUNT_URL",
+        "HRHA_STORAGE_CONTAINER",
+        "HRHA_STORAGE_TABLE_ENDPOINT",
+        "HRHA_MANAGED_IDENTITY_CLIENT_ID",
+    ):
+        env.pop(name, None)
     if env_extra:
         env.update(env_extra)
     return subprocess.run(
@@ -96,7 +105,25 @@ def test_rp013_smoke_storage_disabled_by_default():
 
 def test_rp013_smoke_storage_live_fails_safely_without_config():
     result = _run(
-        "smoke_storage_config.py", "--live", env_extra={"HRHA_ENABLE_LIVE_AZURE": "true"}
+        "smoke_storage_config.py",
+        "--live",
+        env_extra={"HRHA_ENABLE_AZURE_STORAGE": "true"},
     )
     assert result.returncode == 2
     assert "CONFIG ERROR (safe failure)" in result.stdout
+
+
+def test_rp013_smoke_storage_live_config_complete_without_table_endpoint():
+    result = _run(
+        "smoke_storage_config.py",
+        "--live",
+        env_extra={
+            "HRHA_STORAGE_BACKEND": "azure_blob",
+            "HRHA_ENABLE_AZURE_STORAGE": "true",
+            "HRHA_STORAGE_ACCOUNT_URL": "https://placeholder.blob.core.windows.net",
+            "HRHA_STORAGE_CONTAINER": "placeholder",
+        },
+    )
+    assert result.returncode == 0, result.stderr
+    assert "OK: Azure Blob storage config is present for E3" in result.stdout
+    assert "Traceback" not in result.stderr

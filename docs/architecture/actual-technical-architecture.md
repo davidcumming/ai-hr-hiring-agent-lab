@@ -67,18 +67,18 @@ CLI (httpx)        any HTTP client
 
 | Package / module | Responsibility |
 |---|---|
-| Root `function_app.py` | Azure Functions Python ASGI wrapper around the existing FastAPI app factory. It loads normal config, overrides only `persistence.root` to `HRHA_PERSISTENCE_ROOT` or a temp directory for hosted smoke tests, and exports `app = func.AsgiFunctionApp(...)`; no routes, business logic, Foundry, or Azure storage are added here. |
+| Root `function_app.py` | Azure Functions Python ASGI wrapper around the existing FastAPI app factory. It loads normal config, overrides `persistence.root` to `HRHA_PERSISTENCE_ROOT` or a temp directory, and overlays Azure Blob storage app settings only when `HRHA_STORAGE_BACKEND=azure_blob`; no routes, business logic, or Foundry behavior are added here. |
 | Root `host.json` / `.funcignore` / `requirements.txt` | Function host route-prefix config, deployment ignore hygiene, and Azure Functions deployment dependencies. |
 | `api/` | App factory, routes (POST/GET `/api/evaluations`, operation IDs `submitEvaluation`/`getEvaluation`), simulated auth, envelope, HTTP/error mapping, `Idempotency-Key` header handling, `X-Correlation-Id` request/response header. |
 | `cli.py` | Thin HTTP client (stdlib + httpx only — no application imports). |
-| `config.py` | Typed, validated view of `config/lab-config.toml` (pydantic, `extra="forbid"`); provider-ID/backend-family consistency validation; storage backend selection; the `HRHA_ENABLE_LIVE_AZURE` / `HRHA_PROVIDER_KILL_SWITCH` env-guard readers; `tomllib` with `tomli` fallback on Python 3.10. |
+| `config.py` | Typed, validated view of `config/lab-config.toml` (pydantic, `extra="forbid"`); provider-ID/backend-family consistency validation; storage backend selection; Foundry/provider env guard readers (`HRHA_ENABLE_LIVE_AZURE`, `HRHA_PROVIDER_KILL_SWITCH`) plus the storage-specific `HRHA_ENABLE_AZURE_STORAGE`; `tomllib` with `tomli` fallback on Python 3.10. |
 | `council/` | 11-role registry and Mode A/B/C tables, synchronous orchestrator, deterministic code roles. |
 | `domain/` | Run-identity generation (`ids.py`) and all pydantic schema sources: request, per-role council outputs, advisory result, provider contract, audit record + table-row shapes, storage boundary (`storage.py`: `StorageArtifactRef`, `RecordSummaryRow`), per-role transcript (`transcript.py`: `CouncilRoleInvocation`). |
 | `escalation/` | Escalation decision with recorded provenance (`none \| configured_escalated \| policy_triggered`). |
 | `evidence/` | Evidence packet builder (stable segment addressing, rubric view, canonical serialization). |
 | `gates/` | The six deterministic quality gates. |
 | `logging_setup.py` | Central logger + defense-in-depth never-log redaction filter. |
-| `persistence/` | `StorageBackend` ABC + `LocalFilesystemBackend` (active) + `AzureBlobBackend` fail-closed scaffold (`backend.py`, `azure_blob_backend.py`); `LocalStore` facade over the backend plus JSONL table-equivalents; idempotency records. |
+| `persistence/` | `StorageBackend` ABC + `LocalFilesystemBackend` (default local) + `AzureBlobBackend` (explicit Blob record/artifact backend); `LocalStore` facade over the backend plus JSONL table-equivalents; idempotency records. |
 | `prompts/` | Versioned prompt registry: `registry.py` + `templates/<role_id>.v1.md` for 10 roles; mandatory safety constraints test-pinned; templates are recorded into provider metadata, never executed. |
 | `providers/` | `CouncilProvider` seam, provider registry (`registry.py` — lazy resolution + server-side guards), deterministic mock (active), three Foundry scaffolds under `foundry/` (non-functional), legacy `foundry_stub.py` (retained, unreachable via `select_provider`). |
 | `review_queue.py` | Review-queue row construction (metadata-only). |
@@ -160,19 +160,21 @@ CLI (httpx)        any HTTP client
   JSON), `ReviewQueue.jsonl` (one mandatory entry per evaluation).
 
 The layout intentionally mirrors a blob + table-storage design so that a
-future swap targets configuration rather than restructuring. The
-`AzureBlobBackend` scaffold documents that mapping but performs no I/O: it
-fails closed (`StorageNotConfiguredError`) at construction unless fully
-configured **and** `HRHA_ENABLE_LIVE_AZURE=true`, and every operation raises
-even then. **No Azure storage binding of any kind exists**; the active path
-is plain local filesystem I/O.
+future swap targets configuration rather than restructuring. E3 implements
+the first narrow Azure storage path: `AzureBlobBackend` can persist the full
+evaluation record and artifact projections to Blob when explicitly selected
+and `HRHA_ENABLE_AZURE_STORAGE=true`. It does not import Azure SDKs on the
+local default path and rejects connection strings, account keys, SAS tokens,
+and SAS-in-URL query strings.
 
-When imported through `function_app.py`, the same `local_filesystem` backend is
-still used, but `persistence.root` is overridden to `HRHA_PERSISTENCE_ROOT` or
-`<tempdir>/hrha-lab-data`. This avoids writing under the deployed app package
-directory during the first Azure Functions smoke test. That hosted
-local-filesystem persistence is temporary and ephemeral for this bridge slice;
-durable Blob/Table persistence remains a later slice.
+When imported through `function_app.py`, `persistence.root` is overridden to
+`HRHA_PERSISTENCE_ROOT` or `<tempdir>/hrha-lab-data` for local JSONL
+table-equivalent rows. If the wrapper also sees
+`HRHA_STORAGE_BACKEND=azure_blob`, it overlays Blob account URL/container
+settings and uses Blob for record/artifact I/O. Hosted POST-then-GET is
+durable for the full audit record. Azure Table-backed idempotency, evidence
+rows, review queue rows, summary rows, concurrency, retention/recovery, and
+reconciliation remain deferred.
 
 ## 6. Configuration and guards
 
@@ -182,12 +184,16 @@ durable Blob/Table persistence remains a later slice.
   `[storage]` (`backend = "local_filesystem"` default) and `[storage.azure]`
   (empty placeholders; no secrets).
 - Server-side environment guards (read at resolution time, never stored in
-  records): `HRHA_ENABLE_LIVE_AZURE` (default false — every live path
-  disabled) and `HRHA_PROVIDER_KILL_SWITCH` (`true` blocks all Foundry
-  providers).
+  records): `HRHA_ENABLE_LIVE_AZURE` (default false — live model/provider
+  paths disabled), `HRHA_PROVIDER_KILL_SWITCH` (`true` blocks all Foundry
+  providers), and `HRHA_ENABLE_AZURE_STORAGE` (`true` required for the
+  explicitly selected Azure Blob storage backend).
 - Azure Functions wrapper-only persistence override:
   `HRHA_PERSISTENCE_ROOT` (optional; defaults to the process temp directory).
-  This does not alter `config/lab-config.toml` or the normal local app default.
+  Storage app-setting overlay (`HRHA_STORAGE_BACKEND`,
+  `HRHA_STORAGE_ACCOUNT_URL`, `HRHA_STORAGE_CONTAINER`, optional
+  `HRHA_STORAGE_TABLE_ENDPOINT`) is applied only by `function_app.py`. This
+  does not alter `config/lab-config.toml` or the normal local app default.
 - Source-controlled samples, placeholders only: `config/azure.env.sample`,
   `config/role-agent-mapping.sample.json`.
 
@@ -199,7 +205,7 @@ durable Blob/Table persistence remains a later slice.
 | `scripts/vendor_fixtures.py` | Dev-time fixture vendoring/hash refresh. |
 | `scripts/run_council_local.py` | Local deterministic council demo: one synthetic candidate strictly through the in-process HTTP facade; writes the artifact tree; prints a safe summary only (ids, statuses, counts — never document or prompt text). |
 | `scripts/smoke_foundry_config.py` | Disabled-by-default config smoke scaffold; double-guarded (`HRHA_ENABLE_LIVE_AZURE=true` **and** `--live`); no SDK import and no network in the default path; fails safely (exit 2, clear config error) if the live path is requested — live checks are not implemented. |
-| `scripts/smoke_storage_config.py` | Same double-guarded pattern; the default path additionally sanity-checks the local filesystem backend in a temp dir. |
+| `scripts/smoke_storage_config.py` | Disabled-by-default storage config smoke. The default path performs no network I/O and sanity-checks the local filesystem backend in a temp dir. The explicit live-storage config path requires `HRHA_ENABLE_AZURE_STORAGE=true` and `--live`, checks `HRHA_STORAGE_BACKEND=azure_blob` plus Blob account URL/container, and does not require Table endpoint for E3. |
 
 ## 8. Infrastructure-as-code skeleton (placeholders only — nothing deployed)
 
@@ -210,8 +216,9 @@ endpoints, object IDs, or secrets; identity-based access (managed identity +
 RBAC) is the documented pattern — never keys, connection strings, or SAS
 tokens. Manually provisioned Azure lab resources exist out-of-band, including
 the target Function App for the wrapper smoke test; this repository still does
-not provision or manage those resources. Durable Azure storage, Foundry, Entra
-auth, and Copilot Studio registration remain later human-gated slices.
+not provision or manage those resources. Complete Azure Table-backed storage,
+Foundry, Entra auth, and Copilot Studio registration remain later
+human-gated slices.
 
 ## 9. CI
 
@@ -223,8 +230,8 @@ credentials, no deployment, no infrastructure provisioning.
 
 Python ≥ 3.10 (`pyproject.toml`; CI pins 3.10 and the code avoids 3.11+-only
 stdlib — `tomli` fallback in `config.py`), Azure Functions Python library,
-FastAPI, uvicorn, pydantic v2; dev extras: pytest, httpx,
-openapi-spec-validator.
+Azure Identity, Azure Storage Blob, FastAPI, uvicorn, pydantic v2; dev
+extras: pytest, httpx, openapi-spec-validator.
 
 ## 11. What is NOT built
 
@@ -243,10 +250,11 @@ nothing below should be read as implemented:
   (`docs/delivery/slices/slice-e1-candidate-evaluation-council/adr-deferred-foundry-wiring.md`)
   and the BQ-005 region approval; both are human gates before any live
   wiring begins.
-- **No live Azure storage** — the `AzureBlobBackend` is a fail-closed
-  scaffold; all persistence is local filesystem. The Azure Functions wrapper's
-  local filesystem path is temporary/ephemeral for smoke testing, not durable
-  storage.
+- **No complete Azure Storage system of record** — `AzureBlobBackend` can
+  persist full evaluation records and artifact projections to Blob when
+  explicitly enabled for the Azure Functions host. Idempotency rows, evidence
+  JSONL rows, review queue rows, Azure Table summaries, concurrency,
+  retention/recovery, and reconciliation remain local/deferred.
 - **No prompt execution** — prompt templates are recorded provenance only;
   no prompt text is ever sent to any model.
 - **No Copilot Studio** surface or configuration (a registration-readiness

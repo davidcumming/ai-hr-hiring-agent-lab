@@ -15,6 +15,8 @@ description = "AI HR Hiring Agent Lab - slice-e1 Single-Candidate Calibrated Eva
 requires-python = ">=3.10"
 dependencies = [
     "azure-functions",
+    "azure-identity",
+    "azure-storage-blob",
     "fastapi",
     "uvicorn",
     "pydantic>=2",
