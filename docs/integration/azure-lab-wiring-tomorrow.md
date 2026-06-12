@@ -8,8 +8,9 @@ committed.** Real values arrive through an approved channel at wiring time.
 
 ## 0. Human gates that must pass FIRST
 
-No value below may be acted on — no resource created, no setting flipped, no
-live call attempted — until **both** of these human gates pass:
+No live-storage or Foundry value below may be acted on — no resource created,
+no setting flipped to live mode, no live storage/Foundry call attempted —
+until **both** of these human gates pass:
 
 1. **Foundry-wiring ADR approval** —
    [`../delivery/slices/slice-e1-candidate-evaluation-council/adr-deferred-foundry-wiring.md`](../delivery/slices/slice-e1-candidate-evaluation-council/adr-deferred-foundry-wiring.md)
@@ -21,7 +22,9 @@ live call attempted — until **both** of these human gates pass:
    region silently.
 
 Additional standing gates: any merge, any GitHub Issue creation, any Azure
-resource deployment, and residual-risk acceptance are human decisions.
+resource creation, and residual-risk acceptance are human decisions. The
+deterministic ASGI wrapper may be published to the already-created Function
+App as a bridge smoke test only while live flags remain disabled.
 
 ## 1. Azure subscription and resource group
 
@@ -46,9 +49,15 @@ resource deployment, and residual-risk acceptance are human decisions.
 
 | Value | Placeholder | Notes |
 |---|---|---|
-| Function App name | `<function-app-name>` (sample `hrhalab-func`) | Candidate facade host (`infra/bicep/main.bicep`); HTTPS only. |
+| Function App name | `func-hrha-lab-cac001` (already created out-of-band for this lab) | Facade host target for the ASGI wrapper smoke test. This repo can publish code to it, but does not create or manage the resource. |
 | Application Insights resource | `hrhalab-appi` (sample) | Safe-metadata telemetry only; never-log rules apply. |
 | Key Vault name | `hrhalab-kv` (sample) | For secrets that managed identity cannot eliminate; none known today. |
+
+The bridge host is root `function_app.py`, which wraps the existing FastAPI
+facade with Azure Functions. The first hosted smoke test remains
+deterministic/mock-backed and uses temporary local-filesystem persistence via
+`HRHA_PERSISTENCE_ROOT` or the process temp directory. Durable Blob/Table
+persistence is a later slice.
 
 ## 4. Foundry (per the ADR-selected runtime shape)
 
@@ -74,6 +83,7 @@ resource deployment, and residual-risk acceptance are human decisions.
 ```
 HRHA_ENABLE_LIVE_AZURE=false          # flip to true ONLY after both human gates pass
 HRHA_PROVIDER_KILL_SWITCH=false       # leave available as the emergency stop
+HRHA_PERSISTENCE_ROOT=                # optional temp/writable path for hosted local_filesystem smoke state
 HRHA_STORAGE_ACCOUNT_URL=             # https://<storage-account>.blob.core.windows.net
 HRHA_STORAGE_CONTAINER=               # hrha-evaluations
 HRHA_STORAGE_TABLE_ENDPOINT=          # https://<storage-account>.table.core.windows.net
@@ -106,6 +116,9 @@ Foundry check (and all Foundry providers) regardless of everything else.
 
 ## 8. Out of scope for this document
 
-Real values, secrets, deployment commands, portal steps, and any change to
-the deterministic local default. The lab remains synthetic-data-only and
-advisory-only at every stage; live wiring does not change those invariants.
+Real subscription IDs, tenant IDs, object IDs, client IDs, endpoints, keys,
+secrets, portal steps, and any change to the deterministic local default. The
+lab remains synthetic-data-only and advisory-only at every stage; live wiring
+does not change those invariants. Foundry, Entra auth, Copilot Studio
+registration, durable Azure Blob/Table persistence, and live Azure storage
+remain later slices.

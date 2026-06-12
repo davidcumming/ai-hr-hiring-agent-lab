@@ -7,19 +7,25 @@ This document describes **only what is physically built** in this repository
 
 ## 1. System shape
 
-A single local Python application: a FastAPI **facade** that owns the entire
+A Python application: a FastAPI **facade** that owns the entire
 deterministic business contract (identity, authorization, validation,
 idempotency, source integrity, gates, schema validation of role outputs,
 persistence, response envelope), driving a **council orchestrator** whose
 model-backed roles execute only through a **provider seam**, persisting
-through a **storage backend seam** to the local filesystem. There is no
-deployed infrastructure of any kind; every Azure/Foundry-shaped component is
-a fail-closed, non-functional scaffold.
+through a **storage backend seam** to the local filesystem. The repository
+now includes an Azure Functions ASGI host wrapper that can deploy this same
+facade to the already-created lab Function App, but this codebase does not
+create, manage, or configure Azure resources. Real subscription IDs, tenant
+IDs, object IDs, client IDs, endpoints, keys, and secrets remain out of source
+control. Every Foundry/storage-shaped live component remains fail-closed.
 
 ```
 CLI (httpx)        any HTTP client
       \               /
        v             v
+  Azure Functions ASGI wrapper (function_app.py) [deployment bridge only]
+                 |
+                 v
   FastAPI facade (api/app.py, api/routes_evaluations.py)
    ├─ auth (api/auth.py — simulated header identity)
    ├─ envelope/errors (api/envelope.py, api/errors.py)
@@ -46,7 +52,9 @@ CLI (httpx)        any HTTP client
        [recorded into provider metadata; never executed]
    persistence: LocalStore (persistence/store.py)
        └─ StorageBackend seam (persistence/backend.py)
-            ├─ LocalFilesystemBackend → var/lab-data/        [active]
+            ├─ LocalFilesystemBackend → var/lab-data/        [active local default]
+            │                         → temp/HRHA_PERSISTENCE_ROOT
+            │                           [Function wrapper smoke path]
             └─ AzureBlobBackend (persistence/azure_blob_backend.py)
                  [non-functional scaffold; fails closed]
    review queue row builder (review_queue.py)
@@ -59,6 +67,8 @@ CLI (httpx)        any HTTP client
 
 | Package / module | Responsibility |
 |---|---|
+| Root `function_app.py` | Azure Functions Python ASGI wrapper around the existing FastAPI app factory. It loads normal config, overrides only `persistence.root` to `HRHA_PERSISTENCE_ROOT` or a temp directory for hosted smoke tests, and exports `app = func.AsgiFunctionApp(...)`; no routes, business logic, Foundry, or Azure storage are added here. |
+| Root `host.json` / `.funcignore` / `requirements.txt` | Function host route-prefix config, deployment ignore hygiene, and Azure Functions deployment dependencies. |
 | `api/` | App factory, routes (POST/GET `/api/evaluations`, operation IDs `submitEvaluation`/`getEvaluation`), simulated auth, envelope, HTTP/error mapping, `Idempotency-Key` header handling, `X-Correlation-Id` request/response header. |
 | `cli.py` | Thin HTTP client (stdlib + httpx only — no application imports). |
 | `config.py` | Typed, validated view of `config/lab-config.toml` (pydantic, `extra="forbid"`); provider-ID/backend-family consistency validation; storage backend selection; the `HRHA_ENABLE_LIVE_AZURE` / `HRHA_PROVIDER_KILL_SWITCH` env-guard readers; `tomllib` with `tomli` fallback on Python 3.10. |
@@ -128,7 +138,7 @@ CLI (httpx)        any HTTP client
 ## 5. Persistence design (local, storage-shape-mirrored)
 
 `LocalStore` (over `LocalFilesystemBackend`) writes under the configured root
-(default `var/lab-data/`, gitignored):
+(default `var/lab-data/`, gitignored, for normal local FastAPI/dev use):
 
 - `evaluations/{evaluation_id}/record.json` — the full audit record
   (`EvaluationRecord`, `domain/schemas/audit.py`) in canonical JSON (sorted
@@ -157,6 +167,13 @@ configured **and** `HRHA_ENABLE_LIVE_AZURE=true`, and every operation raises
 even then. **No Azure storage binding of any kind exists**; the active path
 is plain local filesystem I/O.
 
+When imported through `function_app.py`, the same `local_filesystem` backend is
+still used, but `persistence.root` is overridden to `HRHA_PERSISTENCE_ROOT` or
+`<tempdir>/hrha-lab-data`. This avoids writing under the deployed app package
+directory during the first Azure Functions smoke test. That hosted
+local-filesystem persistence is temporary and ephemeral for this bridge slice;
+durable Blob/Table persistence remains a later slice.
+
 ## 6. Configuration and guards
 
 - `config/lab-config.toml` — the only runtime configuration file:
@@ -168,6 +185,9 @@ is plain local filesystem I/O.
   records): `HRHA_ENABLE_LIVE_AZURE` (default false — every live path
   disabled) and `HRHA_PROVIDER_KILL_SWITCH` (`true` blocks all Foundry
   providers).
+- Azure Functions wrapper-only persistence override:
+  `HRHA_PERSISTENCE_ROOT` (optional; defaults to the process temp directory).
+  This does not alter `config/lab-config.toml` or the normal local app default.
 - Source-controlled samples, placeholders only: `config/azure.env.sample`,
   `config/role-agent-mapping.sample.json`.
 
@@ -188,9 +208,10 @@ is plain local filesystem I/O.
 values only (`<...>` / `TODO-...`); no real tenant/subscription IDs,
 endpoints, object IDs, or secrets; identity-based access (managed identity +
 RBAC) is the documented pattern — never keys, connection strings, or SAS
-tokens. **Nothing in `infra/` has been deployed, validated against a
-subscription, or approved**; deployment is gated on the human-approved
-Foundry-wiring ADR and the BQ-005 region approval.
+tokens. Manually provisioned Azure lab resources exist out-of-band, including
+the target Function App for the wrapper smoke test; this repository still does
+not provision or manage those resources. Durable Azure storage, Foundry, Entra
+auth, and Copilot Studio registration remain later human-gated slices.
 
 ## 9. CI
 
@@ -201,18 +222,19 @@ credentials, no deployment, no infrastructure provisioning.
 ## 10. Runtime requirements
 
 Python ≥ 3.10 (`pyproject.toml`; CI pins 3.10 and the code avoids 3.11+-only
-stdlib — `tomli` fallback in `config.py`), FastAPI, uvicorn, pydantic v2;
-dev extras: pytest, httpx, openapi-spec-validator.
+stdlib — `tomli` fallback in `config.py`), Azure Functions Python library,
+FastAPI, uvicorn, pydantic v2; dev extras: pytest, httpx,
+openapi-spec-validator.
 
 ## 11. What is NOT built
 
 None of the following exists in this repository as working capability;
 nothing below should be read as implemented:
 
-- **No deployed Azure resources** — the `infra/` skeleton is placeholders
-  only; no deployment has ever been executed; no subscription, resource
-  group, storage account, Function App, or Foundry resource exists for this
-  lab.
+- **No repo-managed Azure resources** — the `infra/` skeleton is placeholders
+  only; this repository does not contain real tenant/subscription IDs,
+  endpoints, object IDs, client IDs, keys, or secrets and does not create or
+  manage Azure infrastructure.
 - **No live Azure AI Foundry integration** — the three Foundry provider
   scaffolds and the legacy stub contain no Azure SDK imports and no network
   code; any invocation raises `ProviderNotConfiguredError`, and server-side
@@ -222,7 +244,9 @@ nothing below should be read as implemented:
   and the BQ-005 region approval; both are human gates before any live
   wiring begins.
 - **No live Azure storage** — the `AzureBlobBackend` is a fail-closed
-  scaffold; all persistence is local filesystem.
+  scaffold; all persistence is local filesystem. The Azure Functions wrapper's
+  local filesystem path is temporary/ephemeral for smoke testing, not durable
+  storage.
 - **No prompt execution** — prompt templates are recorded provenance only;
   no prompt text is ever sent to any model.
 - **No Copilot Studio** surface or configuration (a registration-readiness
