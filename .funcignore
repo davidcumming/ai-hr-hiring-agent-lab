@@ -17,6 +17,7 @@ __pycache__/
 # Local lab/runtime state
 .local/
 var/
+.deploy/
 
 # Coverage and test output
 .coverage

@@ -1,23 +1,29 @@
 #!/usr/bin/env python3
-"""FUTURE Azure storage configuration smoke test — DISABLED BY DEFAULT (target 7.3).
+"""Azure storage configuration smoke test — DISABLED BY DEFAULT.
 
-Scaffold for the live-wiring slice. Today it:
+Default path:
 
-- performs NO network I/O and imports NO Azure SDK unless BOTH
-  ``HRHA_ENABLE_LIVE_AZURE=true`` AND ``--live`` are supplied;
-- in the default (disabled) path, validates only that the local filesystem
-  backend works (write/read/list a throwaway artifact in a temp dir) and
-  reports placeholder status, exiting 0;
-- fails safely (clear config error, no stack trace, exit 2) if the live path
-  is requested while configuration is incomplete — always true in this batch.
+- performs NO network I/O and imports NO Azure SDK;
+- validates only that the local filesystem backend works in a temp dir;
+- exits 0 with a SKIPPED message.
+
+Explicit live-storage config path:
+
+- requires ``--live`` and ``HRHA_ENABLE_AZURE_STORAGE=true``;
+- validates that ``HRHA_STORAGE_BACKEND=azure_blob`` plus Blob account URL and
+  container are present;
+- does not require Table Storage because Slice E3 is Blob-only record
+  durability.
 
 No secrets are read or printed. Intended live auth is identity-based
-(managed identity / DefaultAzureCredential); never keys or connection strings.
+(managed identity / DefaultAzureCredential); never keys, connection strings,
+or SAS tokens.
 """
 
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 import tempfile
 from pathlib import Path
@@ -31,21 +37,29 @@ def main() -> int:
     parser.add_argument(
         "--live",
         action="store_true",
-        help="explicitly request the live storage check (also requires HRHA_ENABLE_LIVE_AZURE=true)",
+        help="explicitly request the live storage config check (also requires HRHA_ENABLE_AZURE_STORAGE=true)",
     )
     args = parser.parse_args()
 
-    from hr_eval_lab.config import live_azure_enabled, load_config
+    from hr_eval_lab.config import (
+        ENV_ENABLE_AZURE_STORAGE,
+        ENV_STORAGE_ACCOUNT_URL,
+        ENV_STORAGE_BACKEND,
+        ENV_STORAGE_CONTAINER,
+        ENV_STORAGE_TABLE_ENDPOINT,
+        azure_storage_enabled,
+        load_config,
+    )
     from hr_eval_lab.persistence.backend import LocalFilesystemBackend
 
     config = load_config(REPO_ROOT / "config" / "lab-config.toml")
-    azure = config.storage.azure
-    print("=== Storage config smoke (scaffold) ===")
+    print("=== Storage config smoke ===")
     print(f"storage.backend            : {config.storage.backend}")
-    print(f"HRHA_ENABLE_LIVE_AZURE     : {live_azure_enabled()}")
-    print(f"azure.account_url          : {'set' if azure.account_url else 'unset (placeholder)'}")
-    print(f"azure.container            : {'set' if azure.container else 'unset (placeholder)'}")
-    print(f"azure.table_endpoint       : {'set' if azure.table_endpoint else 'unset (placeholder)'}")
+    print(f"{ENV_STORAGE_BACKEND:<27}: {os.environ.get(ENV_STORAGE_BACKEND, 'unset')}")
+    print(f"{ENV_ENABLE_AZURE_STORAGE:<27}: {azure_storage_enabled()}")
+    print(f"{ENV_STORAGE_ACCOUNT_URL:<27}: {'set' if os.environ.get(ENV_STORAGE_ACCOUNT_URL) else 'unset'}")
+    print(f"{ENV_STORAGE_CONTAINER:<27}: {'set' if os.environ.get(ENV_STORAGE_CONTAINER) else 'unset'}")
+    print(f"{ENV_STORAGE_TABLE_ENDPOINT:<27}: {'set (optional for E3)' if os.environ.get(ENV_STORAGE_TABLE_ENDPOINT) else 'unset (optional for E3)'}")
 
     # Local backend sanity (no network, throwaway temp dir).
     with tempfile.TemporaryDirectory() as tmp:
@@ -58,33 +72,35 @@ def main() -> int:
         )
     print(f"local_filesystem backend   : {'OK' if ok else 'FAILED'}")
 
-    if not (args.live and live_azure_enabled()):
+    if not (args.live and azure_storage_enabled()):
         print(
-            "SKIPPED: live Azure storage checks are disabled by default. Enable "
-            "with HRHA_ENABLE_LIVE_AZURE=true AND --live — only after live "
-            "wiring is human-approved."
+            "SKIPPED: Azure storage checks are disabled by default. Enable "
+            "with HRHA_ENABLE_AZURE_STORAGE=true AND --live for the explicit "
+            "storage smoke path."
         )
         return 0 if ok else 2
+
+    if os.environ.get(ENV_STORAGE_BACKEND, "").strip() != "azure_blob":
+        print("CONFIG ERROR (safe failure): HRHA_STORAGE_BACKEND must be azure_blob")
+        return 2
 
     missing = [
         name
         for name, value in (
-            ("storage.azure.account_url", azure.account_url),
-            ("storage.azure.container", azure.container),
-            ("storage.azure.table_endpoint", azure.table_endpoint),
+            (ENV_STORAGE_ACCOUNT_URL, os.environ.get(ENV_STORAGE_ACCOUNT_URL, "")),
+            (ENV_STORAGE_CONTAINER, os.environ.get(ENV_STORAGE_CONTAINER, "")),
         )
         if not value.strip()
     ]
     if missing:
         print(f"CONFIG ERROR (safe failure): missing settings: {', '.join(missing)}")
-        print("Live storage wiring is deferred in this batch; this is expected.")
         return 2
 
     print(
-        "CONFIG ERROR (safe failure): live Azure storage connectivity checks are "
-        "not implemented in this batch — wiring is deferred and human-gated."
+        "OK: Azure Blob storage config is present for E3. Connectivity is "
+        "validated by the hosted POST/GET smoke test, not this offline check."
     )
-    return 2
+    return 0 if ok else 2
 
 
 if __name__ == "__main__":

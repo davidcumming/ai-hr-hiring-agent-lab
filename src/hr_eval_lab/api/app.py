@@ -63,8 +63,8 @@ def create_app(
     app.state.config = config
     app.state.provider = provider
     # Storage backend is resolved from [storage] config at app construction —
-    # selecting azure_blob without complete config (or without live Azure
-    # explicitly enabled) fails closed here with StorageNotConfiguredError.
+    # selecting azure_blob without complete config (or without the storage
+    # gate explicitly enabled) fails closed here with StorageNotConfiguredError.
     app.state.store = LocalStore(config.persistence.root, backend=select_backend(config))
     app.state.fixtures = FixtureStore(fixtures_root)
 

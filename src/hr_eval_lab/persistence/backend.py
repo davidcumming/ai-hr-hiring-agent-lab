@@ -5,9 +5,10 @@ and a physical store. Two backends exist:
 
 - :class:`LocalFilesystemBackend` — the default; fully functional; writes the
   artifact-per-evaluation layout under the local persistence root.
-- ``AzureBlobBackend`` (``azure_blob_backend.py``) — scaffold-only; fails
-  closed with :class:`StorageNotConfiguredError`; performs no network I/O and
-  imports no Azure SDK at import time or in default tests.
+- ``AzureBlobBackend`` (``azure_blob_backend.py``) — Blob-backed record and
+  artifact persistence for explicitly enabled Azure Functions paths; fails
+  closed unless configured and ``HRHA_ENABLE_AZURE_STORAGE=true``. It imports
+  no Azure SDK at import time or in default tests.
 
 Local artifact layout (mirrors the future blob layout so wiring is
 configuration, not restructuring)::
@@ -193,8 +194,12 @@ class LocalFilesystemBackend(StorageBackend):
 
 
 def select_backend(config: "LabConfig") -> StorageBackend:  # noqa: F821 (lazy hint)
-    """Resolve the configured storage backend. Lazy: the Azure scaffold module
-    is imported only when explicitly selected (and then fails closed)."""
+    """Resolve the configured storage backend.
+
+    Lazy: the Azure module is imported only when explicitly selected. The
+    module itself still imports no Azure SDKs until it has passed its storage
+    enablement/configuration checks.
+    """
     backend_id = config.storage.backend
     if backend_id == "local_filesystem":
         return LocalFilesystemBackend(config.persistence.root)

@@ -18,29 +18,31 @@ documents, evidence packet, per-role council transcripts, synthesis, gates,
 provider metadata, human review) and a text-free summary row — locally
 through a formal storage-backend seam. All AI-role outputs come from a
 **deterministic mock provider** (provider id `deterministic_mock`); no live
-model, no Azure resource, no network call is involved anywhere in the runtime
-path.
+model call is involved anywhere in the runtime path. The normal local app
+uses local filesystem persistence. The Azure Functions wrapper can explicitly
+overlay Azure Blob persistence for evaluation audit records/artifacts when
+`HRHA_STORAGE_BACKEND=azure_blob` and `HRHA_ENABLE_AZURE_STORAGE=true`.
 
-Azure/Foundry-facing surfaces exist only as **fail-closed, non-functional
-scaffolds**: the three Foundry provider scaffolds and the Azure Blob storage
-backend scaffold raise safe configuration errors on any use (selection is
-additionally blocked by the server-side environment guards
-`HRHA_ENABLE_LIVE_AZURE` and `HRHA_PROVIDER_KILL_SWITCH`); the smoke-test
-scripts are double-guarded and skip all live work by default; the `infra/`
-skeleton is placeholder documentation only and executes nothing. Live wiring
-remains deferred and human-gated. A versioned, source-controlled prompt
-registry (`src/hr_eval_lab/prompts/`) records prompt provenance into every
-audit record; templates are never executed.
+Foundry-facing surfaces exist only as **fail-closed, non-functional
+scaffolds**: the three Foundry provider scaffolds raise safe configuration
+errors on any use (selection is additionally blocked by
+`HRHA_ENABLE_LIVE_AZURE` and `HRHA_PROVIDER_KILL_SWITCH`). Storage smoke
+checks remain disabled by default; the explicit storage config path uses the
+narrow `HRHA_ENABLE_AZURE_STORAGE` gate. The `infra/` skeleton is placeholder
+documentation only and executes nothing. Live model wiring remains deferred
+and human-gated. A versioned, source-controlled prompt registry
+(`src/hr_eval_lab/prompts/`) records prompt provenance into every audit
+record; templates are never executed.
 
 Every result is advisory decision support: `decision_support_only = true` and
 `human_review_required = true` are structurally enforced (`Literal[True]`
 fields in `src/hr_eval_lab/domain/schemas/evaluation.py`), and every
 evaluation produces a human-review queue entry.
 
-A deterministic test suite (`tests/`, DT-001…DT-018 plus a smoke test and the
-RP storage/provider/prompt/contract suite) covers the behavior described
-here: 146 tests pass, 7 live-eval stubs skip with a documented deferral
-rationale, 0 fail (verified run, 2026-06-11).
+A deterministic test suite (`tests/`, DT-001…DT-018 plus RP and smoke
+coverage) covers the behavior described here: 176 tests pass, 7 live-eval
+stubs skip with a documented deferral rationale, 0 fail (verified run,
+2026-06-12).
 
 ## Documents in this folder
 

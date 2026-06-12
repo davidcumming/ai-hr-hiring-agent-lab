@@ -53,6 +53,7 @@ tmp/
 temp/
 .cache/
 .scratch/
+.deploy/
 
 # Local-only incoming material (raw uploaded test-data zips; inspect here, never commit)
 .local/
