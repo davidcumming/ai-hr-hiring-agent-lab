@@ -363,12 +363,18 @@ evaluation audit record. Idempotency rows, evidence JSONL rows, review queue
 rows, and Azure Table Storage system-of-record behavior remain local/deferred
 unless a later slice implements Table-backed persistence.
 
-E7 workflow-storage boundary: `domain/schemas/workflow.py`,
+E7/E8 workflow-storage boundary: `domain/schemas/workflow.py`,
 `workflow_artifacts.py`, and `workflow_queue.py` define the Table, Blob, and
-Queue contracts for future case/workflow slices. `LocalWorkflowStore` can
-persist those shapes locally under `<root>/workflow/` as JSONL rows, files,
-and queue-message JSONL. It is not selected by `create_app()` and imports no
-Azure SDK modules.
+Queue contracts for future case/workflow slices, while
+`persistence/workflow_storage.py` defines the internal protocols and selector.
+`LocalWorkflowStore` is selected by default as `app.state.workflow_storage`
+and persists those shapes locally under `<root>/workflow/` as JSONL rows,
+files, and queue-message JSONL. `AzureWorkflowStorageBackend` can map the same
+contracts to Azure Table Storage, Blob Storage, and Queue Storage only when
+explicitly selected and guarded by `HRHA_ENABLE_AZURE_WORKFLOW_STORAGE=true`;
+it imports Azure SDK modules lazily after guard validation. No public case API,
+notification API, worker loop, Copilot surface, or Azure resource creation is
+added by this boundary.
 
 ## 12. Review queue
 

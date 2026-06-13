@@ -23,6 +23,12 @@ def _run(script: str, *args: str, env_extra: dict | None = None):
         "HRHA_STORAGE_ACCOUNT_URL",
         "HRHA_STORAGE_CONTAINER",
         "HRHA_STORAGE_TABLE_ENDPOINT",
+        "HRHA_STORAGE_QUEUE_ENDPOINT",
+        "HRHA_WORKFLOW_STORAGE_BACKEND",
+        "HRHA_ENABLE_AZURE_WORKFLOW_STORAGE",
+        "HRHA_WORKFLOW_BLOB_CONTAINER",
+        "HRHA_WORKFLOW_TABLE_PREFIX",
+        "HRHA_WORKFLOW_QUEUE_NAME",
         "HRHA_MANAGED_IDENTITY_CLIENT_ID",
     ):
         env.pop(name, None)
@@ -127,3 +133,21 @@ def test_rp013_smoke_storage_live_config_complete_without_table_endpoint():
     assert result.returncode == 0, result.stderr
     assert "OK: Azure Blob storage config is present for E3" in result.stdout
     assert "Traceback" not in result.stderr
+
+
+def test_rp013_smoke_workflow_storage_disabled_by_default():
+    result = _run("smoke_workflow_storage_config.py")
+    assert result.returncode == 0, result.stderr
+    assert "SKIPPED" in result.stdout
+    assert "local workflow storage       : OK" in result.stdout
+    assert "Traceback" not in result.stderr
+
+
+def test_rp013_smoke_workflow_storage_live_fails_safely_without_config():
+    result = _run(
+        "smoke_workflow_storage_config.py",
+        "--live",
+        env_extra={"HRHA_ENABLE_AZURE_WORKFLOW_STORAGE": "true"},
+    )
+    assert result.returncode == 2
+    assert "CONFIG ERROR (safe failure)" in result.stdout

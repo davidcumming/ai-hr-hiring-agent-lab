@@ -1,4 +1,6 @@
 .
+azure-data-tables
 azure-functions
 azure-identity
 azure-storage-blob
+azure-storage-queue

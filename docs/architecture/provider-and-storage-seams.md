@@ -161,10 +161,11 @@ Idempotency logic (`persistence/idempotency.py`) remains a thin layer over
 `StorageBackend` ABC, to avoid a second source of truth (a future Azure
 implementation would map the idempotency table to Azure Table directly).
 
-### Workflow storage foundation (`src/hr_eval_lab/persistence/workflow_store.py`)
+### Workflow storage foundation (`src/hr_eval_lab/persistence/workflow_storage.py`)
 
 E7 adds internal workflow storage contracts beside the existing evaluation
-persistence seam. These are Azure-shaped but local-only:
+persistence seam. E8 adds guarded Azure SDK-backed adapters behind those
+contracts while preserving the local deterministic default:
 
 - `domain/schemas/workflow.py` defines 18 Table-shaped MVP workflow entities
   (`RecruitmentCases`, `CaseParticipants`, `CaseTasks`, `CaseEvents`,
@@ -185,13 +186,24 @@ persistence seam. These are Azure-shaped but local-only:
   `run-model-candidate-assessment`, `run-model-assessment-batch`, and
   `write-notification`; messages reject raw-content and secret markers even
   when injected into otherwise allowed string/list fields.
+- `workflow_storage.py` defines the internal protocol seam:
+  `WorkflowTableStore`, `WorkflowBlobStore`, `WorkflowQueueStore`, and the
+  composed `WorkflowStorageBackend`. `select_workflow_storage()` resolves the
+  backend lazily from `[workflow_storage]`.
 - `LocalWorkflowStore` persists these shapes under `<root>/workflow/` using
   JSONL Table rows, local files for Blob artifacts, and JSONL Queue messages.
-  It imports no Azure SDKs and performs no network I/O.
+  It imports no Azure SDKs, performs no network I/O, and remains the default.
+- `AzureWorkflowStorageBackend` (`persistence/azure_workflow_storage.py`) is
+  functional only when `[workflow_storage] backend = "azure"` is explicitly
+  selected and `HRHA_ENABLE_AZURE_WORKFLOW_STORAGE=true`. It uses Azure Table
+  Storage for E7 Table entities, Azure Blob Storage for canonical E7 artifact
+  paths, and Azure Queue Storage for validated E7 Queue messages. It imports
+  Azure SDKs only inside the real-client builder after configuration guards
+  pass; deterministic tests inject fake clients.
 
-This is **not** a new public API and it is **not** an Azure Table/Queue SDK
-adapter. Future slices can wire these contracts into facade routes, workers,
-or live Azure adapters after architecture review.
+This is **not** a new public API, worker, resource-creation path, or Copilot
+surface. Future slices can wire these contracts into facade routes and workers
+without rewriting the storage boundary.
 
 ### Azure storage status after E3
 
@@ -203,9 +215,12 @@ or live Azure adapters after architecture review.
 - Implemented as Blob compatibility, not Table Storage: `write_metadata_row`
   writes `metadata/evaluations/{evaluation_id}.json` so the current
   `StorageBackend` contract can complete without requiring Table Storage.
-- Deferred: map the summary row and the three JSONL table-equivalents to
-  Azure Table Storage; idempotency lookup becomes a point query on
-  PartitionKey — same semantics.
+- Implemented for workflow foundation only: E8 maps E7 workflow entities,
+  workflow artifacts, and workflow queue messages to guarded Azure
+  Table/Blob/Queue adapters.
+- Deferred: map the evaluation summary row and the three legacy evaluation
+  JSONL table-equivalents to Azure Table Storage; idempotency lookup becomes
+  a point query on PartitionKey — same semantics.
 - Byte-identity determinism (DT-002) depends on the canonical-JSON
   serialization (`backend.canonical_json`); a swap must preserve it.
 - No retention, concurrency-control, or cleanup behavior exists today; a

@@ -36,6 +36,11 @@ class FakeBlobClient:
             raise ResourceNotFoundError(self._name)
         return FakeBlobDownload(self._blobs[self._name])
 
+    def delete_blob(self) -> None:
+        if self._name not in self._blobs:
+            raise ResourceNotFoundError(self._name)
+        del self._blobs[self._name]
+
 
 class FakeBlobContainerClient:
     def __init__(self) -> None:

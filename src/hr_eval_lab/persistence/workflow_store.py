@@ -47,6 +47,21 @@ class LocalWorkflowStore:
 
     # -- Table-shaped rows -----------------------------------------------------
 
+    def upsert_table_entity(self, entity: WorkflowTableEntity) -> dict[str, Any]:
+        row = entity.to_table_entity()
+        path = self._table_path(entity.table_name)
+        rows = [
+            existing
+            for existing in self._read_jsonl(path)
+            if not (
+                existing.get("PartitionKey") == row["PartitionKey"]
+                and existing.get("RowKey") == row["RowKey"]
+            )
+        ]
+        rows.append(row)
+        self._write_jsonl_rows(path, rows)
+        return row
+
     def write_table_entity(self, entity: WorkflowTableEntity) -> dict[str, Any]:
         row = entity.to_table_entity()
         self._append_jsonl(self._table_path(entity.table_name), row)
@@ -81,6 +96,26 @@ class LocalWorkflowStore:
                 return model.from_table_entity(row)
         return None
 
+    def delete_table_entity(
+        self,
+        model: type[WorkflowTableEntity],
+        partition_key: str,
+        row_key: str,
+    ) -> bool:
+        path = self._table_path(model.table_name)
+        rows = self._read_jsonl(path)
+        kept = [
+            row
+            for row in rows
+            if not (
+                row.get("PartitionKey") == partition_key and row.get("RowKey") == row_key
+            )
+        ]
+        if len(kept) == len(rows):
+            return False
+        self._write_jsonl_rows(path, kept)
+        return True
+
     # -- Blob-shaped artifacts -------------------------------------------------
 
     def write_blob_artifact(self, blob_path: str, payload: Any) -> WorkflowBlobArtifactRef:
@@ -102,6 +137,13 @@ class LocalWorkflowStore:
         if raw is None:
             return None
         return json.loads(raw.decode("utf-8"))
+
+    def delete_blob_artifact(self, blob_path: str) -> bool:
+        path = self.blobs_root / validate_blob_path(blob_path)
+        if not path.exists():
+            return False
+        path.unlink()
+        return True
 
     # -- Queue-shaped messages -------------------------------------------------
 
@@ -128,6 +170,48 @@ class LocalWorkflowStore:
     ) -> list[dict[str, Any]]:
         return self._read_jsonl(self._queue_path(queue_name))
 
+    def peek_queue_messages(
+        self, queue_name: str = DEFAULT_QUEUE_NAME, max_messages: int = 1
+    ) -> list[dict[str, Any]]:
+        return self.list_queue_messages(queue_name)[:max_messages]
+
+    def receive_queue_messages(
+        self,
+        queue_name: str = DEFAULT_QUEUE_NAME,
+        max_messages: int = 1,
+        visibility_timeout: int | None = None,
+    ) -> list[Any]:
+        del visibility_timeout
+        from hr_eval_lab.persistence.workflow_storage import (
+            WorkflowQueueReceivedMessage,
+        )
+
+        return [
+            WorkflowQueueReceivedMessage(
+                message_id=row["message_id"],
+                queue_name=queue_name,
+                payload=row["payload"],
+                pop_receipt=f"local-pop-{row['message_id']}",
+            )
+            for row in self.list_queue_messages(queue_name)[:max_messages]
+        ]
+
+    def delete_queue_message(
+        self,
+        message: Any,
+        pop_receipt: str | None = None,
+        queue_name: str | None = None,
+    ) -> bool:
+        del pop_receipt
+        message_id, effective_queue = self._queue_delete_args(message, queue_name)
+        queue_path = self._queue_path(effective_queue)
+        rows = self._read_jsonl(queue_path)
+        kept = [row for row in rows if row.get("message_id") != message_id]
+        if len(kept) == len(rows):
+            return False
+        self._write_jsonl_rows(queue_path, kept)
+        return True
+
     # -- internals -------------------------------------------------------------
 
     def _table_path(self, table_name: str) -> Path:
@@ -142,6 +226,15 @@ class LocalWorkflowStore:
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, "a", encoding="utf-8") as fh:
             fh.write(canonical_table_json(row) + "\n")
+
+    def _write_jsonl_rows(self, path: Path, rows: list[dict[str, Any]]) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if not rows:
+            if path.exists():
+                path.unlink()
+            return
+        body = "".join(canonical_table_json(row) + "\n" for row in rows)
+        path.write_text(body, encoding="utf-8")
 
     def _read_jsonl(self, path: Path) -> list[dict[str, Any]]:
         if not path.exists():
@@ -177,6 +270,21 @@ class LocalWorkflowStore:
             {"queue_name": queue_name, "sequence": sequence, "payload": payload}
         )
         return "msg-" + hashlib.sha256(body.encode("utf-8")).hexdigest()[:24]
+
+    def _queue_delete_args(self, message: Any, queue_name: str | None) -> tuple[str, str]:
+        effective_queue = queue_name
+        if isinstance(message, str):
+            return message, effective_queue or self.DEFAULT_QUEUE_NAME
+        if isinstance(message, dict):
+            value = message.get("message_id") or message.get("id")
+            if value:
+                effective_queue = effective_queue or message.get("queue_name")
+                return str(value), str(effective_queue or self.DEFAULT_QUEUE_NAME)
+        value = getattr(message, "message_id", None) or getattr(message, "id", None)
+        if value:
+            effective_queue = effective_queue or getattr(message, "queue_name", None)
+            return str(value), str(effective_queue or self.DEFAULT_QUEUE_NAME)
+        raise ValueError("received queue message is missing message_id")
 
     def _validate_store_name(self, value: str, label: str) -> None:
         if not value or any(char in value for char in ("/", "\\", "?", "#", "..")):

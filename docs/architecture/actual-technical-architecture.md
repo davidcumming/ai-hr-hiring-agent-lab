@@ -27,12 +27,12 @@ connector contract, stores the returned `evaluation_id` in
 actual manual portal configuration evidence, not source-controlled Copilot
 ALM or production integration.
 
-The repository also defines the E7 workflow storage foundation as internal
-contracts and deterministic local adapters: Azure Table-shaped workflow
-entities, canonical Blob path builders, Azure Queue-shaped message contracts,
-and `LocalWorkflowStore` JSONL/filesystem persistence. These contracts are not
-yet wired into public API endpoints, workers, Copilot topics, or live Azure
-Table/Queue SDK adapters.
+The repository also defines the E7/E8 workflow storage foundation as internal
+contracts and adapters: Azure Table-shaped workflow entities, canonical Blob
+path builders, Azure Queue-shaped message contracts, a deterministic
+`LocalWorkflowStore`, and a guarded `AzureWorkflowStorageBackend` selected only
+by explicit workflow-storage configuration. These contracts are not yet wired
+into public API endpoints, workers, or Copilot topics.
 
 ```
 CLI (httpx)        any HTTP client
@@ -72,12 +72,15 @@ CLI (httpx)        any HTTP client
             │                           [Function wrapper smoke path]
             └─ AzureBlobBackend (persistence/azure_blob_backend.py)
                  [explicit hosted record/artifact backend; guarded]
-   workflow storage foundation (E7, internal only)
+   workflow storage foundation (E7/E8, internal only)
        ├─ workflow Table schemas (domain/schemas/workflow.py)
        ├─ workflow Blob path contracts (domain/schemas/workflow_artifacts.py)
        ├─ workflow Queue message contracts (domain/schemas/workflow_queue.py)
-       └─ LocalWorkflowStore (persistence/workflow_store.py)
-            [local JSONL/filesystem adapter; no Azure SDK imports]
+       ├─ workflow storage protocols/selectors (persistence/workflow_storage.py)
+       ├─ LocalWorkflowStore (persistence/workflow_store.py)
+       │    [default local JSONL/filesystem adapter; no Azure SDK imports]
+       └─ AzureWorkflowStorageBackend (persistence/azure_workflow_storage.py)
+            [explicit guarded Table/Blob/Queue adapter; lazy Azure SDK imports]
    review queue row builder (review_queue.py)
    logging + never-log redaction (logging_setup.py)
    domain schemas (domain/schemas/: request, council, evaluation,
@@ -93,18 +96,18 @@ Copilot Studio manual lab topic
 
 | Package / module | Responsibility |
 |---|---|
-| Root `function_app.py` | Azure Functions Python ASGI wrapper around the existing FastAPI app factory. It loads normal config, overrides `persistence.root` to `HRHA_PERSISTENCE_ROOT` or a temp directory, and overlays Azure Blob storage app settings only when `HRHA_STORAGE_BACKEND=azure_blob`; no routes, business logic, or Foundry behavior are added here. |
+| Root `function_app.py` | Azure Functions Python ASGI wrapper around the existing FastAPI app factory. It loads normal config, overrides `persistence.root` to `HRHA_PERSISTENCE_ROOT` or a temp directory, overlays Azure Blob storage app settings only when `HRHA_STORAGE_BACKEND=azure_blob`, and overlays guarded workflow storage only when `HRHA_WORKFLOW_STORAGE_BACKEND=azure`; no routes, business logic, or Foundry behavior are added here. |
 | Root `host.json` / `.funcignore` / `requirements.txt` | Function host route-prefix config, deployment ignore hygiene, and Azure Functions deployment dependencies. |
 | `api/` | App factory, routes (`POST /api/evaluations` / `submitEvaluation`, `GET /api/evaluations/{evaluation_id}` / `getEvaluation`, `POST /api/evaluations/retrieve` / `retrieveEvaluationForCopilot`), simulated auth, envelope, HTTP/error mapping, `Idempotency-Key` header handling, `X-Correlation-Id` request/response header. |
 | `cli.py` | Thin HTTP client (stdlib + httpx only — no application imports). |
-| `config.py` | Typed, validated view of `config/lab-config.toml` (pydantic, `extra="forbid"`); provider-ID/backend-family consistency validation; storage backend selection; Foundry/provider env guard readers (`HRHA_ENABLE_LIVE_AZURE`, `HRHA_PROVIDER_KILL_SWITCH`) plus the storage-specific `HRHA_ENABLE_AZURE_STORAGE`; `tomllib` with `tomli` fallback on Python 3.10. |
+| `config.py` | Typed, validated view of `config/lab-config.toml` (pydantic, `extra="forbid"`); provider-ID/backend-family consistency validation; evaluation and workflow storage backend selection; Foundry/provider env guard readers (`HRHA_ENABLE_LIVE_AZURE`, `HRHA_PROVIDER_KILL_SWITCH`) plus storage-specific guards (`HRHA_ENABLE_AZURE_STORAGE`, `HRHA_ENABLE_AZURE_WORKFLOW_STORAGE`); `tomllib` with `tomli` fallback on Python 3.10. |
 | `council/` | 11-role registry and Mode A/B/C tables, synchronous orchestrator, deterministic code roles. |
 | `domain/` | Run-identity generation (`ids.py`) and all pydantic schema sources: request, per-role council outputs, advisory result, provider contract, audit record + table-row shapes, storage boundary (`storage.py`: `StorageArtifactRef`, `RecordSummaryRow`), per-role transcript (`transcript.py`: `CouncilRoleInvocation`), and E7 workflow contracts (`workflow.py`, `workflow_artifacts.py`, `workflow_queue.py`). |
 | `escalation/` | Escalation decision with recorded provenance (`none \| configured_escalated \| policy_triggered`). |
 | `evidence/` | Evidence packet builder (stable segment addressing, rubric view, canonical serialization). |
 | `gates/` | The six deterministic quality gates. |
 | `logging_setup.py` | Central logger + defense-in-depth never-log redaction filter. |
-| `persistence/` | `StorageBackend` ABC + `LocalFilesystemBackend` (default local) + `AzureBlobBackend` (explicit Blob record/artifact backend); `LocalStore` facade over the backend plus JSONL table-equivalents; idempotency records; `LocalWorkflowStore` for E7 Table/Blob/Queue-shaped local workflow contracts. |
+| `persistence/` | `StorageBackend` ABC + `LocalFilesystemBackend` (default local) + `AzureBlobBackend` (explicit Blob record/artifact backend); `LocalStore` facade over the backend plus JSONL table-equivalents; idempotency records; workflow storage protocols/selectors; `LocalWorkflowStore` for default E7 Table/Blob/Queue-shaped local workflow contracts; `AzureWorkflowStorageBackend` for explicit guarded SDK-backed workflow storage. |
 | `prompts/` | Versioned prompt registry: `registry.py` + `templates/<role_id>.v1.md` for 10 roles; mandatory safety constraints test-pinned; templates are recorded into provider metadata, never executed. |
 | `providers/` | `CouncilProvider` seam, provider registry (`registry.py` — lazy resolution + server-side guards), deterministic mock (active), three Foundry scaffolds under `foundry/` (non-functional), legacy `foundry_stub.py` (retained, unreachable via `select_provider`). |
 | `review_queue.py` | Review-queue row construction (metadata-only). |
@@ -138,11 +141,12 @@ Copilot Studio manual lab topic
    only text-bearing artifacts; table and summary rows are metadata-first by
    schema construction.
 5. **Workflow storage foundation** (`domain/schemas/workflow*.py`,
-   `persistence/workflow_store.py`) — internal E7 contracts define the MVP
-   case/workflow entity model, exact Blob paths, and async work request
-   messages. The local adapter can write/read those shapes deterministically
-   for tests and future implementation, but no facade route or worker uses
-   them yet.
+   `persistence/workflow_storage.py`, `persistence/workflow_store.py`,
+   `persistence/azure_workflow_storage.py`) — internal E7/E8 contracts define
+   the MVP case/workflow entity model, exact Blob paths, and async work request
+   messages. The local adapter remains deterministic; the Azure adapter maps
+   the same contracts to guarded Table/Blob/Queue SDK clients. No facade route
+   or worker uses them yet.
 
 ## 4. Contracts and versioning
 
@@ -180,7 +184,8 @@ Copilot Studio manual lab topic
   `WorkflowBlobArtifactRef` (`domain/schemas/workflow_artifacts.py`); Queue
   message schemas for `run-model-candidate-assessment`,
   `run-model-assessment-batch`, and `write-notification`
-  (`domain/schemas/workflow_queue.py`). These are internal contracts only and
+  (`domain/schemas/workflow_queue.py`); workflow storage protocols
+  (`persistence/workflow_storage.py`). These are internal contracts only and
   do not change the OpenAPI/Copilot contracts.
 
 ## 5. Persistence design (local, storage-shape-mirrored)
@@ -224,8 +229,9 @@ durable for the full audit record. Azure Table-backed idempotency, evidence
 rows, review queue rows, summary rows, concurrency, retention/recovery, and
 reconciliation remain deferred.
 
-`LocalWorkflowStore` writes E7 workflow foundation data under
-`<root>/workflow/`:
+`select_workflow_storage()` resolves the workflow storage backend from
+`[workflow_storage]`. With committed defaults it returns `LocalWorkflowStore`,
+which writes E7 workflow foundation data under `<root>/workflow/`:
 
 - `tables/<TableName>.jsonl` — Azure Table-shaped rows for the MVP workflow
   entities. List/dict properties are serialized as canonical JSON strings at
@@ -242,9 +248,17 @@ reconciliation remain deferred.
   model assessment and notification messages. Queue schemas reject raw-content
   and secret markers even inside otherwise allowed identifier fields.
 
-This adapter imports no Azure SDK modules and is not selected by
-`create_app()`. It is a deterministic foundation for future case/workflow
-facade slices, not live Azure Table/Blob/Queue execution.
+The local adapter imports no Azure SDK modules and is selected by
+`create_app()` as `app.state.workflow_storage`. It is a deterministic
+foundation for future case/workflow facade slices.
+
+`AzureWorkflowStorageBackend` is available only when `[workflow_storage]
+backend = "azure"` is explicitly selected and
+`HRHA_ENABLE_AZURE_WORKFLOW_STORAGE=true`. It maps the same contracts to Azure
+Table Storage, Azure Blob Storage, and Azure Queue Storage using identity-based
+auth. The Azure SDK imports occur only inside the real-client builder after
+guards pass; deterministic tests inject fake clients. It does not create
+tables, containers, queues, resources, routes, or workers.
 
 ## 6. Configuration and guards
 
@@ -252,18 +266,25 @@ facade slices, not live Azure Table/Blob/Queue execution.
   `[rigor]`, `[escalation]`, `[provider]` (`provider_id` +
   validated-consistent legacy `ai_backend_type`), `[persistence]`,
   `[storage]` (`backend = "local_filesystem"` default) and `[storage.azure]`
-  (empty placeholders; no secrets).
+  (empty placeholders; no secrets), plus `[workflow_storage]`
+  (`backend = "local"` default).
 - Server-side environment guards (read at resolution time, never stored in
   records): `HRHA_ENABLE_LIVE_AZURE` (default false — live model/provider
   paths disabled), `HRHA_PROVIDER_KILL_SWITCH` (`true` blocks all Foundry
   providers), and `HRHA_ENABLE_AZURE_STORAGE` (`true` required for the
-  explicitly selected Azure Blob storage backend).
+  explicitly selected Azure Blob storage backend). E8 adds
+  `HRHA_ENABLE_AZURE_WORKFLOW_STORAGE` for the explicitly selected Azure
+  workflow Table/Blob/Queue backend.
 - Azure Functions wrapper-only persistence override:
   `HRHA_PERSISTENCE_ROOT` (optional; defaults to the process temp directory).
   Storage app-setting overlay (`HRHA_STORAGE_BACKEND`,
   `HRHA_STORAGE_ACCOUNT_URL`, `HRHA_STORAGE_CONTAINER`, optional
-  `HRHA_STORAGE_TABLE_ENDPOINT`) is applied only by `function_app.py`. This
-  does not alter `config/lab-config.toml` or the normal local app default.
+  `HRHA_STORAGE_TABLE_ENDPOINT`, optional `HRHA_STORAGE_QUEUE_ENDPOINT`) is
+  applied only by `function_app.py`. Workflow storage app-setting overlay
+  (`HRHA_WORKFLOW_STORAGE_BACKEND`, `HRHA_WORKFLOW_BLOB_CONTAINER`,
+  `HRHA_WORKFLOW_TABLE_PREFIX`, `HRHA_WORKFLOW_QUEUE_NAME`) is also wrapper
+  only. This does not alter `config/lab-config.toml` or the normal local app
+  default.
 - Source-controlled samples, placeholders only: `config/azure.env.sample`,
   `config/role-agent-mapping.sample.json`.
 
@@ -276,6 +297,7 @@ facade slices, not live Azure Table/Blob/Queue execution.
 | `scripts/run_council_local.py` | Local deterministic council demo: one synthetic candidate strictly through the in-process HTTP facade; writes the artifact tree; prints a safe summary only (ids, statuses, counts — never document or prompt text). |
 | `scripts/smoke_foundry_config.py` | Disabled-by-default config smoke scaffold; double-guarded (`HRHA_ENABLE_LIVE_AZURE=true` **and** `--live`); no SDK import and no network in the default path; fails safely (exit 2, clear config error) if the live path is requested — live checks are not implemented. |
 | `scripts/smoke_storage_config.py` | Disabled-by-default storage config smoke. The default path performs no network I/O and sanity-checks the local filesystem backend in a temp dir. The explicit live-storage config path requires `HRHA_ENABLE_AZURE_STORAGE=true` and `--live`, checks `HRHA_STORAGE_BACKEND=azure_blob` plus Blob account URL/container, and does not require Table endpoint for the current Blob-only storage path. |
+| `scripts/smoke_workflow_storage_config.py` | Disabled-by-default E8 workflow storage smoke. The default path performs no network I/O, imports no Azure SDK, and exercises local workflow Table/Blob/Queue operations in a temp dir. The explicit live path requires `HRHA_ENABLE_AZURE_WORKFLOW_STORAGE=true`, `--live`, `HRHA_WORKFLOW_STORAGE_BACKEND=azure`, Blob/Table/Queue service URLs, a workflow Blob container, and a dedicated empty workflow Queue. |
 
 ## 8. Infrastructure-as-code skeleton (placeholders only — nothing deployed)
 
@@ -301,8 +323,9 @@ credentials, no deployment, no infrastructure provisioning.
 
 Python ≥ 3.10 (`pyproject.toml`; CI pins 3.10 and the code avoids 3.11+-only
 stdlib — `tomli` fallback in `config.py`), Azure Functions Python library,
-Azure Identity, Azure Storage Blob, FastAPI, uvicorn, pydantic v2; dev
-extras: pytest, httpx, openapi-spec-validator.
+Azure Identity, Azure Storage Blob, Azure Data Tables, Azure Storage Queue,
+FastAPI, uvicorn, pydantic v2; dev extras: pytest, httpx,
+openapi-spec-validator.
 
 ## 11. What is NOT built
 
@@ -323,15 +346,15 @@ nothing below should be read as implemented:
   wiring begins.
 - **No complete live Azure Storage system of record** — `AzureBlobBackend` can
   persist full evaluation records and artifact projections to Blob when
-  explicitly enabled for the Azure Functions host. E7 defines internal
-  Table/Blob/Queue contracts and a local deterministic workflow store, but
-  idempotency rows, evidence JSONL rows, review queue rows, Azure Table
-  summaries, queue processing, concurrency, retention/recovery, and
-  reconciliation remain local/deferred.
-- **No case-management or notification API** — E7 adds internal workflow data
-  contracts only. There is no `POST /api/cases`, case search/open endpoint,
-  notification endpoint, assessment-status endpoint, worker, or Copilot topic
-  wiring for those contracts.
+  explicitly enabled for the Azure Functions host. E8 adds guarded
+  SDK-backed workflow Table/Blob/Queue adapters behind the E7 contracts, but
+  evaluation idempotency rows, evidence JSONL rows, review queue rows,
+  Azure Table summaries, queue processing, concurrency, retention/recovery,
+  and reconciliation remain local/deferred.
+- **No case-management or notification API** — E7/E8 add internal workflow
+  data contracts and adapters only. There is no `POST /api/cases`, case
+  search/open endpoint, notification endpoint, assessment-status endpoint,
+  worker, or Copilot topic wiring for those contracts.
 - **No prompt execution** — prompt templates are recorded provenance only;
   no prompt text is ever sent to any model.
 - **No source-controlled or production Copilot Studio integration** — one

@@ -49,7 +49,11 @@ print(json.dumps({
         "azure.identity",
         "azure.storage",
         "azure.storage.blob",
+        "azure.storage.queue",
+        "azure.data",
+        "azure.data.tables",
         "hr_eval_lab.persistence.azure_blob_backend",
+        "hr_eval_lab.persistence.azure_workflow_storage",
     )
 }))
 """
@@ -60,6 +64,12 @@ print(json.dumps({
         "HRHA_STORAGE_ACCOUNT_URL",
         "HRHA_STORAGE_CONTAINER",
         "HRHA_STORAGE_TABLE_ENDPOINT",
+        "HRHA_STORAGE_QUEUE_ENDPOINT",
+        "HRHA_WORKFLOW_STORAGE_BACKEND",
+        "HRHA_ENABLE_AZURE_WORKFLOW_STORAGE",
+        "HRHA_WORKFLOW_BLOB_CONTAINER",
+        "HRHA_WORKFLOW_TABLE_PREFIX",
+        "HRHA_WORKFLOW_QUEUE_NAME",
         "HRHA_MANAGED_IDENTITY_CLIENT_ID",
     ):
         env.pop(name, None)
@@ -77,13 +87,18 @@ print(json.dumps({
         "azure.identity": False,
         "azure.storage": False,
         "azure.storage.blob": False,
+        "azure.storage.queue": False,
+        "azure.data": False,
+        "azure.data.tables": False,
         "hr_eval_lab.persistence.azure_blob_backend": False,
+        "hr_eval_lab.persistence.azure_workflow_storage": False,
     }
 
 
 def test_rp005_no_azure_import_on_default_path(make_client):
     """Default app construction + evaluation must not import Azure storage SDKs."""
     sys.modules.pop("hr_eval_lab.persistence.azure_blob_backend", None)
+    sys.modules.pop("hr_eval_lab.persistence.azure_workflow_storage", None)
     client = make_client()
     from tests.conftest import post_evaluation
 
@@ -95,8 +110,11 @@ def test_rp005_no_azure_import_on_default_path(make_client):
         or m.startswith("azure.identity.")
         or m == "azure.storage"
         or m.startswith("azure.storage.")
+        or m == "azure.data"
+        or m.startswith("azure.data.")
     ]
     assert "hr_eval_lab.persistence.azure_blob_backend" not in sys.modules
+    assert "hr_eval_lab.persistence.azure_workflow_storage" not in sys.modules
 
 
 def test_rp005_local_app_ignores_ambient_storage_env(make_client, monkeypatch):

@@ -7,8 +7,9 @@ existing FastAPI facade, a narrow Azure Blob storage path for durable
 evaluation audit records/artifacts when the Function App explicitly sets
 `HRHA_STORAGE_BACKEND=azure_blob` and `HRHA_ENABLE_AZURE_STORAGE=true`, and
 a manual Copilot Studio lab configuration for one synthetic topic workflow.
-It also contains E7 internal workflow storage contracts and a deterministic
-local workflow store for future case/workflow slices.
+It also contains E7 internal workflow storage contracts, a deterministic local
+workflow store selected by default, and E8 guarded Azure SDK-backed workflow
+Table/Blob/Queue adapters for explicitly enabled storage checks.
 The repository still does not create or manage Azure resources, perform
 external API calls by default, or contain credentials or secrets. Real
 subscription IDs, tenant IDs, object IDs, client IDs, endpoints, keys, and
@@ -24,10 +25,10 @@ What exists is a deployment bridge plus planned integration seams:
 | Foundry provider scaffolds (three runtime shapes) | `src/hr_eval_lab/providers/foundry/` (`project_responses.py`, `prompt_agent.py`, `hosted_agent.py`), resolved by `provider.provider_id` via `providers/registry.py` | Non-functional by design: no Azure/Foundry SDK imports, no network code; any invocation raises `ProviderNotConfiguredError`. Resolution is additionally blocked server-side by `HRHA_PROVIDER_KILL_SWITCH=true` and by `HRHA_ENABLE_LIVE_AZURE` unset/false. No runtime shape is chosen — that is the deferred ADR's decision. |
 | Legacy Foundry seam stub | `src/hr_eval_lab/providers/foundry_stub.py` | Retained for contract-shape reference but **unreachable** via `select_provider()` (the registry routes on `provider_id`); flagged for removal consideration when live wiring is undertaken. |
 | Azure Blob storage backend | `src/hr_eval_lab/persistence/azure_blob_backend.py` (selected by `storage.backend = "azure_blob"` after wrapper env overlay or explicit test config) | Functional for Blob-backed evaluation records/artifacts only. No Azure SDK import on the local default path; construction fails closed without `HRHA_ENABLE_AZURE_STORAGE=true`, Blob account URL, and container. Table Storage, idempotency rows, evidence rows, and review queue durability are deferred. |
-| E7 workflow storage foundation | `src/hr_eval_lab/domain/schemas/workflow.py`, `workflow_artifacts.py`, `workflow_queue.py`; `src/hr_eval_lab/persistence/workflow_store.py` | Internal contracts and local deterministic adapter for the MVP Table/Blob/Queue data model. No public API, Copilot topic, worker, Azure Table SDK path, or Azure Queue SDK path is added. |
+| E7/E8 workflow storage foundation | `src/hr_eval_lab/domain/schemas/workflow.py`, `workflow_artifacts.py`, `workflow_queue.py`; `src/hr_eval_lab/persistence/workflow_storage.py`; `src/hr_eval_lab/persistence/workflow_store.py`; `src/hr_eval_lab/persistence/azure_workflow_storage.py` | Internal contracts, local deterministic default adapter, and guarded SDK-backed Azure Table/Blob/Queue adapter for the MVP workflow data model. No public API, Copilot topic, worker, or Azure resource creation is added. |
 | Provider trace/eval metadata placeholders | `src/hr_eval_lab/domain/schemas/provider.py` | Nullable `trace_id`, `eval_run_id`, `agent_run_id`, `model_deployment`, `prompt_version`, `prompt_template_id`, `prompt_template_version`, `model_or_agent_ref`, `safe_error` fields (plus a `warnings` list) exist so a live backend can fill them; under the mock they are local placeholders, deterministic prompt provenance, or null. |
-| Disabled-by-default smoke scripts | `scripts/smoke_foundry_config.py`, `scripts/smoke_storage_config.py` | Default paths perform no network I/O and import no Azure Storage SDK. Foundry remains double-guarded by `HRHA_ENABLE_LIVE_AZURE=true` and `--live`; storage config checks use `HRHA_ENABLE_AZURE_STORAGE=true` and `--live`. |
-| Infra-as-code skeleton | `infra/` (README, placeholder Bicep, sample parameters/env) | Placeholders only; this repo does not provision resources. Manually provisioned Azure lab resources exist out-of-band, but real IDs, endpoints, keys, and secrets are not committed. Complete Table-backed Azure system-of-record behavior remains a later slice. |
+| Disabled-by-default smoke scripts | `scripts/smoke_foundry_config.py`, `scripts/smoke_storage_config.py`, `scripts/smoke_workflow_storage_config.py` | Default paths perform no network I/O and import no Azure Storage SDK. Foundry remains double-guarded by `HRHA_ENABLE_LIVE_AZURE=true` and `--live`; evaluation Blob storage checks use `HRHA_ENABLE_AZURE_STORAGE=true` and `--live`; workflow Table/Blob/Queue checks use `HRHA_ENABLE_AZURE_WORKFLOW_STORAGE=true` and `--live`. |
+| Infra-as-code skeleton | `infra/` (README, placeholder Bicep, sample parameters/env) | Placeholders only; this repo does not provision resources. Manually provisioned Azure lab resources exist out-of-band, but real IDs, endpoints, keys, and secrets are not committed. Complete production workflow behavior and worker/runtime provisioning remain later slices. |
 | Deferred ADR draft for live Foundry wiring | `docs/delivery/slices/slice-e1-candidate-evaluation-council/adr-deferred-foundry-wiring.md` | **Draft. NOT approved.** Records the open decisions (Agent Service vs Agent Framework, backend-type enumeration, live metadata contract, region/data residency). Human approval of this ADR is a hard gate before any live wiring, resource creation, model calls, or token spend. |
 | Live-eval stubs LE-001…LE-007 | `tests/live_evals/test_le_stubs.py` | Skip unconditionally with a documented deferral rationale; they assert nothing until a live backend exists. |
 
@@ -44,8 +45,8 @@ Concrete values needed for future live wiring (placeholders only):
 The deployed Function App smoke path remains deterministic and mock-backed.
 Foundry, Entra auth, production Copilot integration, source-controlled Copilot
 ALM/export, Azure Queue workers, case-management APIs, notification APIs, and
-complete live Azure Table-backed system-of-record behavior are still not
-enabled.
+complete production workflow behavior are still not enabled. The E8 Azure
+workflow adapter is storage-only, explicitly guarded, and internal.
 
 ## Deployment and hosted smoke
 

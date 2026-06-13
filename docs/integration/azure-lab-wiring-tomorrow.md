@@ -10,9 +10,10 @@ committed.** Real values arrive through an approved channel at wiring time.
 
 No Foundry value below may be acted on — no Foundry setting flipped to live
 mode and no Foundry/model call attempted — until **both** of these human gates
-pass. Slice E3's Azure Blob storage path is the narrow exception for
-already-created lab resources: it is storage-only, deterministic/mock-backed,
-and still requires explicit app settings plus identity-based auth.
+pass. Slice E3's Azure Blob storage path and E8's workflow Table/Blob/Queue
+storage adapter path are the narrow exceptions for already-created lab
+resources: both are storage-only, deterministic/mock-backed at the application
+layer, and require explicit app settings plus identity-based auth.
 
 1. **Foundry-wiring ADR approval** —
    [`../delivery/slices/slice-e1-candidate-evaluation-council/adr-deferred-foundry-wiring.md`](../delivery/slices/slice-e1-candidate-evaluation-council/adr-deferred-foundry-wiring.md)
@@ -27,7 +28,9 @@ Additional standing gates: any merge, any GitHub Issue creation, any Azure
 resource creation, and residual-risk acceptance are human decisions. The
 deterministic ASGI wrapper may be published to the already-created Function
 App while `HRHA_ENABLE_LIVE_AZURE=false` and `HRHA_PROVIDER_KILL_SWITCH=true`;
-Blob storage is enabled separately by `HRHA_ENABLE_AZURE_STORAGE=true`.
+Blob storage is enabled separately by `HRHA_ENABLE_AZURE_STORAGE=true`;
+guarded workflow storage is enabled separately by
+`HRHA_ENABLE_AZURE_WORKFLOW_STORAGE=true`.
 
 ## 1. Azure subscription and resource group
 
@@ -45,9 +48,9 @@ Blob storage is enabled separately by `HRHA_ENABLE_AZURE_STORAGE=true`.
 |---|---|---|
 | Storage account name | `<storage-account>` (3–24 lowercase alphanumerics; sample `hrhalabstor`) | `infra/bicep/main.bicep`; shared-key access disabled (`allowSharedKeyAccess: false`). |
 | Blob account URL | `https://<storage-account>.blob.core.windows.net` | `config/lab-config.toml` `[storage.azure] account_url` / app setting `HRHA_STORAGE_ACCOUNT_URL`. |
-| Blob container name | `hrha-evaluations` (suggested) | `[storage.azure] container` / `HRHA_STORAGE_CONTAINER`. Blob layout mirrors the local tree: `evaluations/{evaluation_id}/record.json` + artifact projections. |
-| Table endpoint | `https://<storage-account>.table.core.windows.net` | Optional/future live adapter target. E7 defines local Table-shaped workflow contracts for `RecruitmentCases`, gates, notifications, source documents, packages, model assessments, human reviews, and final evaluations; no Azure Table SDK path uses this endpoint yet. |
-| Queue endpoint | `https://<storage-account>.queue.core.windows.net` | Future live async target. E7 defines local Queue message contracts for `run-model-candidate-assessment`, `run-model-assessment-batch`, and `write-notification`; no Azure Queue SDK path or worker exists yet. |
+| Blob container name | `hrha-evaluations` (suggested) | `[storage.azure] container` / `HRHA_STORAGE_CONTAINER`. Blob layout mirrors the local evaluation tree for E3 and can also hold E8 workflow artifacts by canonical E7 blob name. |
+| Table endpoint | `https://<storage-account>.table.core.windows.net` | Explicit E8 workflow live-smoke target. E7 defines Table-shaped workflow contracts for `RecruitmentCases`, gates, notifications, source documents, packages, model assessments, human reviews, and final evaluations; E8 can use this endpoint only behind `HRHA_ENABLE_AZURE_WORKFLOW_STORAGE=true`. |
+| Queue endpoint | `https://<storage-account>.queue.core.windows.net` | Explicit E8 workflow live-smoke target. E7 defines Queue message contracts for `run-model-candidate-assessment`, `run-model-assessment-batch`, and `write-notification`; E8 can send/peek/receive/delete those messages only behind `HRHA_ENABLE_AZURE_WORKFLOW_STORAGE=true`. No worker exists. |
 
 ## 3. Facade host
 
@@ -63,10 +66,12 @@ By default it can still use temporary local-filesystem persistence via
 `HRHA_PERSISTENCE_ROOT` or the process temp directory. When the Function App
 has `HRHA_STORAGE_BACKEND=azure_blob` and `HRHA_ENABLE_AZURE_STORAGE=true`,
 the wrapper overlays Azure Blob persistence for the evaluation audit record
-and artifact projections. Complete Table-backed system-of-record behavior is
-a later slice. E7 adds local deterministic Table/Blob/Queue-shaped workflow
-contracts and adapters only; the Function wrapper does not select them and no
-portal or cloud configuration is required for them.
+and artifact projections. Complete production workflow behavior is a later
+slice. E7 adds deterministic Table/Blob/Queue-shaped workflow contracts and
+local adapters; E8 adds guarded SDK-backed workflow storage adapters and lets
+the Function wrapper select them only when
+`HRHA_WORKFLOW_STORAGE_BACKEND=azure` is explicitly set. No portal or cloud
+configuration is required for the default path.
 
 ## 4. Foundry (per the ADR-selected runtime shape)
 
@@ -97,7 +102,13 @@ HRHA_STORAGE_BACKEND=azure_blob       # Function wrapper overlay only; local TOM
 HRHA_ENABLE_AZURE_STORAGE=true        # narrow storage gate; does not enable Foundry/model calls
 HRHA_STORAGE_ACCOUNT_URL=             # https://<storage-account>.blob.core.windows.net
 HRHA_STORAGE_CONTAINER=               # hrha-evaluations
-HRHA_STORAGE_TABLE_ENDPOINT=          # future live Table adapter target
+HRHA_STORAGE_TABLE_ENDPOINT=          # https://<storage-account>.table.core.windows.net
+HRHA_STORAGE_QUEUE_ENDPOINT=          # https://<storage-account>.queue.core.windows.net
+HRHA_WORKFLOW_STORAGE_BACKEND=        # azure only for explicit E8 workflow storage checks
+HRHA_ENABLE_AZURE_WORKFLOW_STORAGE=false
+HRHA_WORKFLOW_BLOB_CONTAINER=         # optional; defaults to HRHA_STORAGE_CONTAINER
+HRHA_WORKFLOW_TABLE_PREFIX=           # optional alphanumeric prefix
+HRHA_WORKFLOW_QUEUE_NAME=             # dedicated empty queue for workflow live smoke
 HRHA_FOUNDRY_PROJECT_ENDPOINT=        # https://<foundry-resource>.services.ai.azure.com/api/projects/<project>
 HRHA_FOUNDRY_MODEL_DEPLOYMENT=        # <model-deployment-name>
 HRHA_FOUNDRY_AGENT_ID_PREFIX=         # <agent-id-or-prefix>
@@ -122,6 +133,19 @@ HRHA_STORAGE_CONTAINER=hrha-evaluations \
 python3 scripts/smoke_storage_config.py --live
 ```
 
+Workflow storage config-only smoke for E8:
+
+```bash
+HRHA_WORKFLOW_STORAGE_BACKEND=azure \
+HRHA_ENABLE_AZURE_WORKFLOW_STORAGE=true \
+HRHA_STORAGE_ACCOUNT_URL=https://<storage-account>.blob.core.windows.net \
+HRHA_STORAGE_TABLE_ENDPOINT=https://<storage-account>.table.core.windows.net \
+HRHA_STORAGE_QUEUE_ENDPOINT=https://<storage-account>.queue.core.windows.net \
+HRHA_WORKFLOW_BLOB_CONTAINER=hrha-evaluations \
+HRHA_WORKFLOW_QUEUE_NAME=hrha-workflow-smoke \
+python3 scripts/smoke_workflow_storage_config.py --live
+```
+
 Hosted connectivity is validated by POST then GET against the Function App,
 deriving the hostname dynamically from Azure:
 
@@ -143,11 +167,12 @@ python3 scripts/smoke_foundry_config.py
 ```
 
 Only run `HRHA_ENABLE_LIVE_AZURE=true python3 scripts/smoke_foundry_config.py --live`
-after the Foundry ADR and region/data-residency gates pass. Both smoke
-scripts print no secrets and exit 2 with a clear configuration error rather
-than a stack trace when required values are missing. `HRHA_PROVIDER_KILL_SWITCH=true`
-blocks the Foundry check and all Foundry providers regardless of everything
-else.
+after the Foundry ADR and region/data-residency gates pass. Smoke scripts print
+no secrets and exit 2 with a clear configuration error rather than a stack
+trace when required values are missing. The E8 workflow storage live smoke
+requires a pre-provisioned Table service, Blob container, and dedicated empty
+Queue; it does not create resources. `HRHA_PROVIDER_KILL_SWITCH=true` blocks
+the Foundry check and all Foundry providers regardless of everything else.
 
 ## 8. Out of scope for this document
 
@@ -155,8 +180,8 @@ Real subscription IDs, tenant IDs, object IDs, client IDs, endpoints, keys,
 secrets, portal steps, and any change to the deterministic local default. The
 lab remains synthetic-data-only and advisory-only at every stage; live wiring
 does not change those invariants. Foundry, live model calls, Entra auth,
-Copilot Studio registration, Azure Queue workers, and complete live
-Table-backed Azure Storage system-of-record behavior remain later slices.
-Slice E3 only makes Blob evaluation records/artifacts durable enough for POST
-then GET; E7 only adds source-controlled workflow storage contracts and a
-local deterministic adapter.
+Copilot Studio registration, Azure Queue workers, and complete production
+workflow behavior remain later slices. Slice E3 only makes Blob evaluation
+records/artifacts durable enough for POST then GET; E7 adds source-controlled
+workflow storage contracts and a local deterministic adapter; E8 adds guarded
+SDK-backed workflow storage adapters without public workflow behavior.

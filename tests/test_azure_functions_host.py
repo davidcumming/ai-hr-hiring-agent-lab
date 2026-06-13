@@ -60,6 +60,12 @@ STORAGE_ENV_NAMES = (
     "HRHA_STORAGE_ACCOUNT_URL",
     "HRHA_STORAGE_CONTAINER",
     "HRHA_STORAGE_TABLE_ENDPOINT",
+    "HRHA_STORAGE_QUEUE_ENDPOINT",
+    "HRHA_WORKFLOW_STORAGE_BACKEND",
+    "HRHA_ENABLE_AZURE_WORKFLOW_STORAGE",
+    "HRHA_WORKFLOW_BLOB_CONTAINER",
+    "HRHA_WORKFLOW_TABLE_PREFIX",
+    "HRHA_WORKFLOW_QUEUE_NAME",
     "HRHA_MANAGED_IDENTITY_CLIENT_ID",
 )
 
@@ -152,6 +158,7 @@ def test_function_app_applies_storage_env_overlay_only_in_wrapper(monkeypatch):
     )
     monkeypatch.setenv("HRHA_STORAGE_CONTAINER", "placeholder")
     monkeypatch.delenv("HRHA_STORAGE_TABLE_ENDPOINT", raising=False)
+    monkeypatch.delenv("HRHA_STORAGE_QUEUE_ENDPOINT", raising=False)
 
     module = _load_function_app_module()
     try:
@@ -161,7 +168,13 @@ def test_function_app_applies_storage_env_overlay_only_in_wrapper(monkeypatch):
         assert config.storage.backend == "azure_blob"
         assert config.storage.azure.container == "placeholder"
         assert config.storage.azure.table_endpoint == ""
+        assert config.storage.azure.queue_endpoint == ""
+        assert config.workflow_storage.backend == "local"
         assert type(module.fastapi_app.state.store.backend).__name__ == "AzureBlobBackend"
+        assert (
+            type(module.fastapi_app.state.workflow_storage).__name__
+            == "LocalWorkflowStore"
+        )
     finally:
         _clear_function_app_modules()
 

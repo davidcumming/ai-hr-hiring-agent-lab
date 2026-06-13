@@ -36,8 +36,23 @@ backend = "local_filesystem"
 
 [storage.azure]
 # PLACEHOLDERS ONLY — empty by default; identity-based auth intended for the
-# live path (no connection strings, keys, or SAS tokens, ever). table_endpoint
-# is retained as a future placeholder but is not required for Slice E3.
+# live path (no connection strings, keys, or SAS tokens, ever). Table/Queue
+# endpoints are used only by explicit guarded workflow-storage paths.
 account_url = ""
 container = ""
 table_endpoint = ""
+queue_endpoint = ""
+
+[workflow_storage]
+# local (default) | azure (guarded E8 Workflow Table/Blob/Queue adapter).
+# Ordinary local app construction reads this file only and does not overlay
+# HRHA_WORKFLOW_STORAGE_BACKEND.
+backend = "local"
+# Optional Azure Blob container override for workflow artifacts. Empty means
+# use storage.azure.container on the explicit Azure path.
+blob_container = ""
+# Optional alphanumeric prefix for all workflow Table names on the explicit
+# Azure path. Empty means use the E7 logical table names directly.
+table_prefix = ""
+# Local queue file name and explicit Azure Queue name default.
+queue_name = "workflow-jobs"

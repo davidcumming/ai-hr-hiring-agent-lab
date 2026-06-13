@@ -17,7 +17,8 @@ Readiness-pack additions (all local/deterministic by default):
 - Env guards (read at resolution time, never stored in records):
   ``HRHA_ENABLE_LIVE_AZURE`` and ``HRHA_PROVIDER_KILL_SWITCH`` govern
   Foundry/provider paths; ``HRHA_ENABLE_AZURE_STORAGE`` is the narrower gate
-  for the Azure Blob storage backend.
+  for the Azure Blob storage backend. ``HRHA_ENABLE_AZURE_WORKFLOW_STORAGE``
+  is the E8 storage-only gate for Workflow Table/Blob/Queue adapters.
 
 PLAN DEVIATION (recorded): the implementation plan assumed stdlib ``tomllib``
 (Python 3.11+). This environment runs Python 3.10, so we fall back to the
@@ -64,9 +65,13 @@ PROVIDER_BACKEND_FAMILY: dict[str, AiBackendType] = {
     "foundry_hosted_agent": "foundry_agents",
 }
 
-#: Storage backend selector. ``local_filesystem`` is the default and the only
-#: functional backend.
+#: Storage backend selector. ``local_filesystem`` is the default; ``azure_blob``
+#: is guarded and limited to evaluation record/artifact persistence.
 StorageBackendId = Literal["local_filesystem", "azure_blob"]
+
+#: Workflow storage backend selector. ``local`` is the deterministic default;
+#: ``azure`` is guarded and limited to E7 workflow Table/Blob/Queue contracts.
+WorkflowStorageBackendId = Literal["local", "azure"]
 
 #: Foundry live-path switch. Unset/anything-but-"true" keeps live AI paths
 #: disabled (the lab default). Azure Blob storage has its own narrower gate.
@@ -75,11 +80,18 @@ ENV_ENABLE_LIVE_AZURE = "HRHA_ENABLE_LIVE_AZURE"
 ENV_PROVIDER_KILL_SWITCH = "HRHA_PROVIDER_KILL_SWITCH"
 #: Narrow live-storage gate. Read only when azure_blob is explicitly selected.
 ENV_ENABLE_AZURE_STORAGE = "HRHA_ENABLE_AZURE_STORAGE"
+#: E8 guarded workflow storage gate. Read only when workflow backend is azure.
+ENV_ENABLE_AZURE_WORKFLOW_STORAGE = "HRHA_ENABLE_AZURE_WORKFLOW_STORAGE"
 #: Azure Functions wrapper-only storage backend overlay.
 ENV_STORAGE_BACKEND = "HRHA_STORAGE_BACKEND"
 ENV_STORAGE_ACCOUNT_URL = "HRHA_STORAGE_ACCOUNT_URL"
 ENV_STORAGE_CONTAINER = "HRHA_STORAGE_CONTAINER"
 ENV_STORAGE_TABLE_ENDPOINT = "HRHA_STORAGE_TABLE_ENDPOINT"
+ENV_STORAGE_QUEUE_ENDPOINT = "HRHA_STORAGE_QUEUE_ENDPOINT"
+ENV_WORKFLOW_STORAGE_BACKEND = "HRHA_WORKFLOW_STORAGE_BACKEND"
+ENV_WORKFLOW_BLOB_CONTAINER = "HRHA_WORKFLOW_BLOB_CONTAINER"
+ENV_WORKFLOW_TABLE_PREFIX = "HRHA_WORKFLOW_TABLE_PREFIX"
+ENV_WORKFLOW_QUEUE_NAME = "HRHA_WORKFLOW_QUEUE_NAME"
 ENV_MANAGED_IDENTITY_CLIENT_ID = "HRHA_MANAGED_IDENTITY_CLIENT_ID"
 
 DEFAULT_CONFIG_PATH = Path("config") / "lab-config.toml"
@@ -98,6 +110,14 @@ def provider_kill_switch_active() -> bool:
 def azure_storage_enabled() -> bool:
     """True only when HRHA_ENABLE_AZURE_STORAGE is explicitly 'true'."""
     return os.environ.get(ENV_ENABLE_AZURE_STORAGE, "false").strip().lower() == "true"
+
+
+def azure_workflow_storage_enabled() -> bool:
+    """True only when HRHA_ENABLE_AZURE_WORKFLOW_STORAGE is explicitly 'true'."""
+    return (
+        os.environ.get(ENV_ENABLE_AZURE_WORKFLOW_STORAGE, "false").strip().lower()
+        == "true"
+    )
 
 
 class RigorConfig(BaseModel):
@@ -135,20 +155,35 @@ class PersistenceConfig(BaseModel):
 class AzureStorageConfig(BaseModel):
     """Blob storage settings. Empty by default; no secrets ever.
 
-    ``table_endpoint`` may be present for future slices but is not required by
-    E3 because Table Storage durability is explicitly deferred.
+    ``table_endpoint`` and ``queue_endpoint`` are used only by explicit E8
+    workflow-storage paths. They remain empty in committed local defaults.
     """
 
     model_config = ConfigDict(extra="forbid")
     account_url: str = ""  # e.g. https://<storage-account>.blob.core.windows.net (placeholder)
     container: str = ""  # e.g. hrha-evaluations (placeholder)
     table_endpoint: str = ""  # e.g. https://<storage-account>.table.core.windows.net (placeholder)
+    queue_endpoint: str = ""  # e.g. https://<storage-account>.queue.core.windows.net (placeholder)
 
 
 class StorageConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     backend: StorageBackendId = "local_filesystem"
     azure: AzureStorageConfig = AzureStorageConfig()
+
+
+class WorkflowStorageConfig(BaseModel):
+    """E8 workflow Table/Blob/Queue storage selector.
+
+    ``backend = "local"`` is the default deterministic path. ``azure`` is
+    selected only by explicit config objects or the Azure Functions overlay.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+    backend: WorkflowStorageBackendId = "local"
+    blob_container: str = ""  # optional override; defaults to storage.azure.container
+    table_prefix: str = ""  # optional alphanumeric prefix for all workflow tables
+    queue_name: str = "workflow-jobs"
 
 
 class LabConfig(BaseModel):
@@ -161,6 +196,7 @@ class LabConfig(BaseModel):
     provider: ProviderConfig = ProviderConfig()
     persistence: PersistenceConfig = PersistenceConfig()
     storage: StorageConfig = StorageConfig()
+    workflow_storage: WorkflowStorageConfig = WorkflowStorageConfig()
 
 
 def load_config(path: str | Path | None = None) -> LabConfig:

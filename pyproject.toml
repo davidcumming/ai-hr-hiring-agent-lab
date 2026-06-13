@@ -14,9 +14,11 @@ version = "0.1.0"
 description = "AI HR Hiring Agent Lab - slice-e1 Single-Candidate Calibrated Evaluation Council (advisory, evidence-grounded, deterministic mock backend with Foundry seam)."
 requires-python = ">=3.10"
 dependencies = [
+    "azure-data-tables",
     "azure-functions",
     "azure-identity",
     "azure-storage-blob",
+    "azure-storage-queue",
     "fastapi",
     "uvicorn",
     "pydantic>=2",

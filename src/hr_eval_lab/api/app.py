@@ -26,6 +26,7 @@ from hr_eval_lab.config import LabConfig, load_config
 from hr_eval_lab.logging_setup import get_logger
 from hr_eval_lab.persistence.backend import select_backend
 from hr_eval_lab.persistence.store import LocalStore
+from hr_eval_lab.persistence.workflow_storage import select_workflow_storage
 from hr_eval_lab.providers.base import CouncilProvider, select_provider
 from hr_eval_lab.sources.fixture_store import FixtureStore
 
@@ -66,6 +67,7 @@ def create_app(
     # selecting azure_blob without complete config (or without the storage
     # gate explicitly enabled) fails closed here with StorageNotConfiguredError.
     app.state.store = LocalStore(config.persistence.root, backend=select_backend(config))
+    app.state.workflow_storage = select_workflow_storage(config)
     app.state.fixtures = FixtureStore(fixtures_root)
 
     app.add_exception_handler(ApiError, api_error_handler)
