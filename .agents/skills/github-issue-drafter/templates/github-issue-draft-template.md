@@ -1,15 +1,29 @@
-# GitHub Issue Draft
+# GitHub Issue Record
 
-*One block per issue. All fields required unless marked optional. No PHI, PII, or Canadian-residency-restricted data in any field.*
+*One block per issue. All fields required unless marked optional. No PHI, PII, secrets, tenant/subscription IDs, real candidate data, sensitive screenshots, raw eval transcripts, or Canadian-residency-restricted data in any field.*
 
 ---
 
-## Draft Issue: `<sequential number>`
+## Issue Record: `<sequential number>`
+
+**Status:** Created / Draft
+**Created issue:** `#<number>` — `<URL>` or `N/A — draft`
+**Draft reason:** `N/A — created` / `Requested draft mode` / `GitHub tooling unavailable` / `Duplicate status could not be checked` / `Sensitive or disclosure-risky publication` / `<other>`
 
 **Title (summary):** `<concise, action-oriented — e.g., "Add French language quality eval for summarization endpoint">`
 **Type:** `<canonical type from Process Doc §27>`
 **Severity:** Critical / High / Medium / Low
-**Suggested labels:** `<comma-separated>`
+**Applied labels:** `<comma-separated, or "N/A — draft">`
+**Recommended labels unavailable:** `<comma-separated or "None">`
+
+### Source trace
+*Trace the issue to the source that caused it.*
+
+| Field | Value |
+|---|---|
+| Related slice | `<slice-id>` — `<slice-name>` |
+| Source artifact | `<traceability matrix / validation report / eval summary / manual evidence / deviation log / implementation finding / other>` |
+| Source finding ID | `<finding ID, scenario ID, gap ID, or "N/A">` |
 
 ### Context
 *1–3 sentences: what the slice implemented and why this was not resolved before merge.*
@@ -37,9 +51,6 @@
 *Risk if unresolved; explicit for security-risk and manual-config-debt types.*
 `<risk statement>`
 
-### Related slice
-`<slice-id>` — `<slice-name>`
-
 ### Related evidence
 *Eval artifact, test run, validation report, or manual evidence — by reference, not raw data.*
 `<references or "none">`
@@ -56,4 +67,4 @@
 
 ---
 
-*Status: DRAFT — not created. Requires Release Authority approval before creation in GitHub.*
+*Issue creation is backlog tracking only. This record does not approve an ADR, accept residual risk, authorize release, approve merge, or commit delivery scope.*

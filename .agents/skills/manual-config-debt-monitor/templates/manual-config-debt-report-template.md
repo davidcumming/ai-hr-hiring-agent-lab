@@ -48,11 +48,11 @@ Summarize the applicable policy and reference its source.
 
 ## New Debt This Slice
 
-| Item | Surface | Issue Exists? | Issue ID | Risk if Not Source-Controlled |
+| Item | Surface | Issue Exists? | Issue ID / Draft Reason | Risk if Not Source-Controlled |
 |---|---|---|---|---|
-| `<desc>` | `<surface>` | `Yes / No` | `#<id> or —` | `<risk>` |
+| `<desc>` | `<surface>` | `Yes / Draft` | `#<id> + URL or draft reason` | `<risk>` |
 
-> **Gap (per item without an Issue):** `<item>` — GitHub Issue required (via `github-issue-drafter`, human approval) before next slice begins.
+> **Gap (per item without an Issue):** `<item>` — GitHub Issue required via `github-issue-drafter`; create safe tracking issues directly or record why draft mode was required before next slice begins.
 
 ---
 

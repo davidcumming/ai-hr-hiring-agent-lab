@@ -31,7 +31,7 @@ Assemble the full slice closeout package from artifacts produced across Stages 2
 | 8 | ADRs created or updated | Yes | All ADRs raised or changed this slice; "none" if none |
 | 9 | Architecture guideline updates | Conditional | Summarize; "none" if no changes |
 | 10 | Master documentation updates | Yes | Current-state and actual-architecture changes |
-| 11 | GitHub follow-up issue summary | Yes | From `github-issue-drafter` |
+| 11 | GitHub follow-up issue summary | Yes | Created issue refs or safe drafts from `github-issue-drafter` |
 | 12 | Known residual risks | Yes | From eval failure classification, traceability gaps, deviation log |
 | 13 | Human approval records | Conditional | Stage 11 high-risk review, ADR approvals; "none yet" if Stage 16 pending |
 
@@ -58,13 +58,13 @@ State which current-state and actual-architecture sections were updated. Confirm
 For each residual risk (non-blocking eval failures, traceability gaps, known limitations, accepted deviations, manual-config debt): Risk ID, description, source stage/artifact, severity, disposition (accepted/deferred/mitigated), required action before/after merge, issue reference. The Release Authority explicitly accepts each at Stage 16.
 
 ### Step 7 — Summarize follow-up issues
-List all GitHub Issue drafts and relevant existing open issues: number/draft, type, severity, title, disposition (new draft / existing open).
+List all GitHub follow-up issues and relevant existing open issues: number/URL or draft reason, type, severity, title, disposition (created / safe draft / existing open).
 
 ### Step 8 — Produce merge-readiness recommendation
 
 | State | Criteria |
 |---|---|
-| **Ready for Release Authority review** | All blocking items resolved; matrix complete; no evidence gaps; draft issues prepared; approval checklist complete |
+| **Ready for Release Authority review** | All blocking items resolved; matrix complete; no evidence gaps; required safe issues created or intentionally drafted; approval checklist complete |
 | **Conditionally ready** | Minor non-blocking gaps, tracked as issues; human judgement required on residual risks |
 | **Not ready** | One or more blocking gaps, missing evidence, or unresolved blocking items |
 
@@ -96,7 +96,7 @@ Before handoff, confirm:
 - [ ] The traceability coverage summary in the package matches the matrix artifact.
 - [ ] The merge-readiness recommendation is explicit (Ready / Conditionally ready / Not ready) and stated as a recommendation, not a decision.
 - [ ] The human approval checklist is present, pre-populated, and marked "Pending Stage 16 review".
-- [ ] No GitHub Issues are presented as created; the package notes it is a transient artifact for `archive-package-preparer`, with durable outputs identified for retention.
+- [ ] Created GitHub Issues include number/URL; drafts include an explicit draft reason; no issue implies ADR approval, risk acceptance, release approval, merge approval, or committed scope.
 
 ---
 
@@ -114,4 +114,4 @@ Before handoff, confirm:
 
 ## 13. Handoff to Next Skill
 
-Pass the package to `definition-of-done-validator` (Stage 15) for independent validation. The Release Authority reviews the package, the DoD report, and the issue drafts at Stage 16. After merge, pass the package to `archive-package-preparer` (Stage 17); implementation and process lessons flow to `slice-retro-and-lessons` (Stage 18). The skill response must include the complete package, an evidence-gap section (or "No evidence gaps"), a residual-risk register (or "No residual risks identified"), a follow-up issue summary, the merge-readiness recommendation with reasoning, the human approval checklist, and a clear statement that the Release Authority must approve at Stage 16 before merge. Obeys the recommend-never-approve and source-of-truth rules in AGENTS.md.
+Pass the package to `definition-of-done-validator` (Stage 15) for independent validation. The Release Authority reviews the package, the DoD report, and the issue summary at Stage 16. After merge, pass the package to `archive-package-preparer` (Stage 17); implementation and process lessons flow to `slice-retro-and-lessons` (Stage 18). The skill response must include the complete package, an evidence-gap section (or "No evidence gaps"), a residual-risk register (or "No residual risks identified"), a follow-up issue summary, the merge-readiness recommendation with reasoning, the human approval checklist, and a clear statement that the Release Authority must approve at Stage 16 before merge. Obeys the recommend-never-approve and source-of-truth rules in AGENTS.md.

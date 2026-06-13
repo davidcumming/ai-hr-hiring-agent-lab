@@ -50,8 +50,8 @@ The stage sequence, conditional triggers, execution models, and fix-loop routing
 **Human gates (the orchestrator must stop at each — never auto-approves or merges):**
 
 - **ADR approval** (Stage 6, conditional): when `adr-gap-detector` flags a required ADR. Approved → dispatch `architecture-guideline-updater` → Stage 7; rejected/deferred → surface blocked state.
-- **Eval-failure clarification** (Stage 11, conditional): when `eval-failure-classifier` returns "ambiguous requirement." Clarified → re-run Stage 10; accepted as non-blocking → flag for Stage 16 approval.
-- **Closeout & merge** (Stage 16, always): present closeout package, residual-risk summary, and drafted issues; merge only on explicit human approval.
+- **Eval-failure clarification** (Stage 11, conditional): when `eval-failure-classifier` returns "ambiguous requirement." Clarified → re-run Stage 10; accepted as non-blocking → flag residual-risk acceptance for Stage 16 approval.
+- **Closeout & merge** (Stage 16, always): present closeout package, residual-risk summary, and issue summary; merge only on explicit human approval.
 - **Next-slice selection** (Stage 20): present `next-slice-recommender` output; wait for the human to choose before Stage 0 of the next slice.
 
 Subagents are explicitly wrong at the ADR and closeout/merge gates and the ambiguous-eval-failure loop — the human must see and steer that context (Orchestration Map §6).

@@ -22,7 +22,7 @@ Conditional on high-risk eval scenarios (Process Doc §18.2); not produced for s
 
 - Classifying failures (`eval-failure-classifier`) or summarizing eval results for the repo (`eval-result-summarizer`).
 - Approving risk or accepting non-blocking failures (human release authority).
-- Producing the full closeout package (`closeout-package-builder`) or creating GitHub Issues (`github-issue-drafter`).
+- Producing the full closeout package (`closeout-package-builder`) or handling GitHub Issue create/draft actions (`github-issue-drafter`).
 
 ---
 
@@ -101,7 +101,7 @@ After the human reviewer completes the package:
 
 - All items approved: orchestrator proceeds to Stage 12 (`current-state-reconciler`), with approval records attached to the closeout package.
 - Blocking items rejected: fix loop applies (as with any `BLOCK` outcome).
-- Non-blocking acceptances requiring issues: `github-issue-drafter` drafts them.
+- Non-blocking acceptances requiring issues: `github-issue-drafter` creates safe tracking issues or drafts decision-needed/sensitive items.
 - Regression promotion recommended: `regression-promotion-recommender` evaluates candidates.
 
 Return with: package status (`complete`/`partial`/`blocked`); count of scenarios requiring review; count of decision questions needing answers; key risks the reviewer must consider. Do not approve risk or recommend merge; state that the human's decisions are required before the slice can proceed.

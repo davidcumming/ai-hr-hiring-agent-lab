@@ -32,7 +32,7 @@
 - **Secondary factors:** `<optional>`
 - **Treatment path:** `<per SKILL.md §7.2 Step 3>`
 - **Regression promotion candidate?** `Yes / No / Maybe — reason`
-- **GitHub Issue draft inputs:** `<title / type / severity / acceptance / re-test — or "Not required">`
+- **GitHub Issue inputs:** `<title / type / severity / acceptance / re-test — or "Not required">`
 
 ---
 
@@ -117,9 +117,9 @@
 
 ---
 
-## 8. GitHub Issue Draft Inputs
+## 8. GitHub Issue Inputs
 
-*For `github-issue-drafter`. Issues require human approval before creation.*
+*For `github-issue-drafter`. Safe backlog issues may be created directly; sensitive, decision-needed, or tooling-blocked items remain drafts with a reason.*
 
 | Scenario ID | Proposed Title | Type | Severity | Acceptance Criteria | Re-test Criteria | Slice Context |
 |---|---|---|---|---|---|---|

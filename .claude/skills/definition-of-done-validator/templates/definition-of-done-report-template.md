@@ -21,7 +21,7 @@
 | 8 | Architecture guidelines and ADRs consistent | | `<ref>` | |
 | 9 | Traceability complete for the slice risk level | | `<ref>` | |
 | 10 | Manual evidence reviewed | | `<ref>` | |
-| 11 | Required GitHub Issues created (or drafts awaiting approval) | | `<ref>` | |
+| 11 | Required GitHub Issues created, or safe drafts carry explicit reasons | | `<ref>` | |
 | 12 | Manual-config debt below defined ceiling | | `<ref>` | |
 | 13 | Durable implementation lessons promoted | Met / Not yet verifiable (Stage 18) | `<ref>` | |
 | 14 | Durable process lessons promoted | Met / Not yet verifiable (Stage 18) | `<ref>` | |

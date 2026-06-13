@@ -164,7 +164,7 @@
 
 | Issue | Type | Severity | Title | Status |
 |---|---|---|---|---|
-| `#<N>` or Draft-`<N>` | `<type>` | `<severity>` | `<title>` | Existing open / New draft — awaiting approval |
+| `#<N>` + URL or Draft-`<N>` | `<type>` | `<severity>` | `<title>` | Existing open / Created / Safe draft — `<draft reason>` |
 
 *If none: "No follow-up issues."*
 
@@ -198,7 +198,7 @@
 | 6 | Architecture guidelines and ADRs consistent | | |
 | 7 | Traceability complete for the slice risk level | | |
 | 8 | Manual evidence reviewed | | |
-| 9 | Required GitHub Issues created (after approval of drafts) | | |
+| 9 | Required GitHub Issues created, or intentionally drafted because creation was unsafe/unavailable/requested | | |
 | 10 | Manual-config debt below defined ceiling | | |
 | 11 | All residual risks explicitly accepted | | |
 | 12 | Merge readiness approved | | |

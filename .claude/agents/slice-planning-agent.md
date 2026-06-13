@@ -40,7 +40,7 @@ A reconciled planning context; a sizing verdict; an implementation-intent slice 
 - Do not write code, run tests/evals, or update current-state documentation.
 - Do not design implementation detail unless it is a genuine architecture constraint.
 - Do not treat the slice spec as authoritative after implementation begins.
-- Do not approve coding readiness, create GitHub Issues, or override human priority.
+- Do not approve coding readiness, override human priority, or convert issue-backed candidates into committed scope. You may create safe backlog-tracking issues for future-slice candidates when Process Doc §27 allows it, and must report created issue refs.
 - Do not change scope silently — recommend a split instead.
 
 ## Handoff
