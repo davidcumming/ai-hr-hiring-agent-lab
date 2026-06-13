@@ -1,6 +1,6 @@
 ---
 name: github-issue-drafter
-description: Drafts well-structured GitHub Issues for unresolved, deferred, or risk-bearing work surfaced during planning, implementation, evals, or closeout. Use when tracking gaps; never creates issues.
+description: Creates safe GitHub Issues for backlog tracking, or drafts them when requested, tooling is unavailable, or publication is sensitive/risky. Use when tracking unresolved, deferred, or risk-bearing work.
 ---
 # Skill: GitHub Issue Drafter
 
@@ -12,7 +12,9 @@ description: Drafts well-structured GitHub Issues for unresolved, deferred, or r
 
 ## 1. Purpose
 
-Draft well-structured GitHub Issues for unresolved, deferred, or risk-bearing work surfaced during planning, implementation, evals, documentation reconciliation, or closeout. Each draft is ready for human review and, once the Release Authority approves, for direct creation in GitHub. This skill drafts issues only; it never creates them — creation needs human approval (Process Doc §27).
+Create well-structured GitHub Issues for unresolved, deferred, or risk-bearing backlog work surfaced during planning, implementation, evals, documentation reconciliation, or closeout. Use **create mode** by default when GitHub tooling is available, duplicates have been checked, and the issue is safe to publish. Use **draft mode** when the user asks for a draft, GitHub tooling is unavailable, duplicate status cannot be checked, or publication could create security, privacy, compliance, disclosure, or external-facing risk.
+
+Creating an issue records backlog work; it does not approve an ADR, accept residual risk, authorize release, approve merge, or convert backlog into committed delivery scope.
 
 ---
 
@@ -22,6 +24,8 @@ Draft well-structured GitHub Issues for unresolved, deferred, or risk-bearing wo
 - Drafting duplicates — if an existing open issue already covers the item, note that issue and do not draft.
 - Replacing the traceability matrix — the matrix finds gaps; this skill drafts the response to them.
 - Inventing issue types — the authoritative list is Process Doc §27; reference it by number, do not restate it in output.
+- Closing, deleting, reprioritizing, assigning, milestoning, or converting issues into committed scope.
+- Publishing sensitive or disclosure-risky content that belongs in a secure artifact reference.
 
 ---
 
@@ -36,7 +40,11 @@ Draft well-structured GitHub Issues for unresolved, deferred, or risk-bearing wo
 | 5 | Manual-config / source-control debt | Conditional | Debt items needing tracking |
 | 6 | Architecture gaps | Conditional | From `adr-gap-detector` (Stage 6); gaps deferred without an approved ADR |
 | 7 | Open GitHub Issues (current) | Yes | Required to avoid duplicates |
-| 8 | Slice ID and name | Yes | For the "Related slice" field |
+| 8 | Repository labels | Recommended | Apply standard labels when available; recommend unavailable labels |
+| 9 | GitHub tooling availability | Yes | Create mode requires working issue-create tooling |
+| 10 | Requested mode | Optional | `create` / `draft`; default is `create` when safe |
+| 11 | Publication-safety context | Yes | Whether content is safe to publish in an issue |
+| 12 | Slice ID and name | Yes | For the "Related slice" field |
 
 ---
 
@@ -48,10 +56,13 @@ Gather all candidates and deduplicate against the open-issue list. Where an exis
 ### Step 2 — Determine issue type
 Confirm each type against Process Doc §27. If a candidate fits no type, use the closest match and note the uncertainty; do not invent types. Fallback is `technical-debt` with a note.
 
-### Step 3 — Draft each issue
-Complete `templates/github-issue-draft-template.md`. Every field is populated or explicitly "TBD — requires human input". Never leave blank: Type, Summary (title), Context, Reason created, Severity, Acceptance criteria (≥1), Verification / re-test criteria, Related slice.
+### Step 3 — Run the publication-safety check
+Before creating anything, confirm the body contains no secrets, credentials, tenant IDs, subscription IDs, personal data, real candidate data, sensitive screenshots, raw eval transcripts, or sensitive payloads. If sensitive detail is needed, reference the secure artifact instead. If the issue would be security-sensitive, compliance-sensitive, external-facing, or disclosure-sensitive, use draft mode and state the reason.
 
-### Step 4 — Assess severity
+### Step 4 — Prepare each issue record
+Complete `templates/github-issue-draft-template.md`. Every field is populated or explicitly "TBD — requires human input". Never leave blank: Type, Summary (title), Context, Reason created, Severity, Acceptance criteria (≥1), Verification / re-test criteria, Related slice, Source trace, Labels.
+
+### Step 5 — Assess severity
 
 | Severity | Characteristics |
 |---|---|
@@ -62,17 +73,19 @@ Complete `templates/github-issue-draft-template.md`. Every field is populated or
 
 Do not assign Critical to issues the Release Authority has already accepted as non-blocking.
 
-### Step 5 — Suggest labels
-Propose ≥1 label per issue (starting suggestions only; teams override): `bug` → `bug` (+`regression` if a previously passing scenario); `documentation-gap` → `documentation`; `source-control-debt` → `tech-debt`,`source-control`; `eval-failure` → `eval`,`blocking`/`non-blocking`; `architecture-decision-needed` → `architecture`,`adr-needed`; `security-risk` → `security` (+`privacy` if residency-related); `manual-config-debt` → `tech-debt`,`config`; `test-gap` → `testing`; `technical-debt` → `tech-debt`; `enhancement` → `enhancement`.
+### Step 6 — Apply or suggest labels
+Use standard labels where available, especially `agent-created`, `follow-up`, `manual-config-debt`, `documentation`, `eval`, `architecture`, `copilot-studio`, `azure`, and type-specific repo labels. If a desired label does not exist, create the issue without that label and report it as "recommended label unavailable" rather than inventing a label.
 
-### Step 6 — Produce the draft package
-Output all drafts in one structured response, grouped by type. State clearly that no issue has been created and that human approval is required before creation.
+### Step 7 — Create or draft
+Use create mode when tooling is available and the issue is safe to publish. After creation, capture the issue number, URL, labels applied, and source trace.
+
+Use draft mode when requested, tooling is unavailable, duplicate status cannot be checked, or the publication-safety check fails. State the draft reason and what must happen before creation.
 
 ---
 
 ## 9. Output Format
 
-Use `templates/github-issue-draft-template.md` per issue. Reference sensitive eval content by artifact ID; no PHI, PII, or Canadian-residency-restricted data in any issue body — flag anything that belongs in secure storage for the human to redact before creation. The full output is: (1) a duplicate-check summary noting any candidate skipped for an existing open issue; (2) the draft issues; (3) an approval prompt for the Release Authority.
+Use `templates/github-issue-draft-template.md` per issue. Reference sensitive eval content by artifact ID; no PHI, PII, secrets, tenant/subscription IDs, real candidate data, sensitive screenshots, raw eval transcripts, or Canadian-residency-restricted data in any issue body. The full output is: (1) duplicate-check summary noting any candidate skipped for an existing open issue; (2) safety-check summary; (3) created issue records with numbers/URLs and labels, plus draft records with draft reasons; (4) caveats on missing tooling, missing labels, or sensitive publication risk.
 
 ---
 
@@ -80,21 +93,23 @@ Use `templates/github-issue-draft-template.md` per issue. Reference sensitive ev
 
 Before handoff, confirm:
 
-- [ ] The open-issue list was checked; no draft duplicates an existing open issue of the same scope.
-- [ ] No draft was created for a fully completed item (Covered in the traceability matrix).
+- [ ] The open-issue list was checked; no issue record duplicates an existing open issue of the same scope.
+- [ ] No issue was created or drafted for a fully completed item (Covered in the traceability matrix).
 - [ ] Each title is concise and action-oriented (describes the gap/action, not a symptom).
 - [ ] Each issue type is one of the canonical Process Doc §27 types; none invented; non-GitHub trackers not referenced.
-- [ ] Each draft has all required fields populated or explicitly TBD, including ≥1 testable acceptance criterion and stated verification / re-test criteria.
+- [ ] Each issue record has all required fields populated or explicitly TBD, including ≥1 testable acceptance criterion and stated verification / re-test criteria.
 - [ ] Severity is assessed; Critical is not applied to items the Release Authority already accepted as non-blocking.
-- [ ] For security-risk and manual-config-debt drafts, the risk is explicit.
+- [ ] For security-risk and manual-config-debt items, the risk is explicit.
 - [ ] Related slice is populated; owner/priority default to "TBD — requires human input" when unknown (no personal names unless provided).
-- [ ] No PHI, PII, or Canadian-residency-restricted data appears in any field.
-- [ ] No language implies an issue has been created or that issue creation is risk acceptance.
-- [ ] The "Awaiting human approval — no issues created" statement is present.
-- [ ] Drafts are grouped by type; any candidate not drafted (duplicate or insufficient info) is listed with a reason.
+- [ ] Source trace is populated with the source slice, artifact, finding, eval result, or implementation evidence that caused the issue.
+- [ ] No PHI, PII, secrets, tenant/subscription IDs, real candidate data, sensitive screenshots, raw eval transcripts, or Canadian-residency-restricted data appears in any field.
+- [ ] Labels are applied when available or reported as unavailable recommendations.
+- [ ] Created issues include number and URL; drafts include a clear draft reason.
+- [ ] No language implies that issue creation is risk acceptance, ADR approval, release approval, merge approval, or a final product/architecture decision.
+- [ ] Issue records are grouped by type; any candidate not created/drafted (duplicate or insufficient info) is listed with a reason.
 
 ---
 
 ## 13. Handoff to Next Skill
 
-After Release Authority approval (Stage 16): approved drafts are created in GitHub by a human-directed action; `closeout-package-builder` records the issue numbers; `archive-package-preparer` (Stage 17) references the issue list in the manifest; `manual-config-debt-monitor` (Stage 19) consumes `manual-config-debt` and `source-control-debt` issues for ceiling tracking. The skill response must include the duplicate-check summary (or "No duplicates found"), all drafts, the "Awaiting human approval — no issues created" statement, an explicit list of candidates not drafted, and any caveats on missing input. Obeys the recommend-never-approve and source-of-truth rules in AGENTS.md; drafting an issue for a residual risk is tracking, not approval.
+Pass created issue refs and draft records to `closeout-package-builder`; `archive-package-preparer` (Stage 17) references the issue list in the manifest; `manual-config-debt-monitor` (Stage 19) consumes `manual-config-debt` and `source-control-debt` issues for ceiling tracking. The skill response must include the duplicate-check summary (or "No duplicates found"), safety-check summary, created issue refs, draft records with reasons, candidates skipped, and any caveats on missing input or unavailable labels. Obeys the recommend-never-approve and source-of-truth rules in AGENTS.md; creating or drafting an issue for a residual risk is tracking, not approval.

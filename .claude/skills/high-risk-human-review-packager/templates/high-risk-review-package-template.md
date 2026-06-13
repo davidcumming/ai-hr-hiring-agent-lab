@@ -63,7 +63,7 @@ The fix loop must be completed and scenarios re-evaluated before this package is
 
 ## 6. Non-Blocking Candidates Requiring Approval
 
-*Each requires explicit approval before the slice proceeds. If approved, a GitHub Issue must be created.*
+*Each requires explicit approval before the slice proceeds. The residual work must be tracked by a created GitHub Issue or a safe draft with an explicit reason.*
 
 | Scenario ID | Residual Risk | Failure Rate | Proposed GitHub Issue | Your Decision |
 |---|---|---|---|---|
@@ -72,7 +72,7 @@ The fix loop must be completed and scenarios re-evaluated before this package is
 **Approval conditions (all required per Process Doc §22.2):**
 - [ ] Severity classified.
 - [ ] Failure documented (in the eval summary).
-- [ ] GitHub Issue will be created.
+- [ ] GitHub Issue is created or intentionally drafted with reason.
 - [ ] Re-test criteria defined.
 
 ---

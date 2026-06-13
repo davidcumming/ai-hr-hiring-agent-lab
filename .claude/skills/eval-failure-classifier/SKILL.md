@@ -24,7 +24,7 @@ Run isolated: this skill must execute in an agent context that did not produce t
 
 - Approving non-blocking failures or accepting residual risk (human gate, §22.2); recommending merge (human gate, Stage 16).
 - Weakening rubrics to reclassify failures as passes; classifying in the same context that produced the summary.
-- Drafting GitHub Issues (`github-issue-drafter`); running evals (`live-eval-runner`); deciding regression-suite entry (`regression-promotion-recommender`).
+- Handling GitHub Issue create/draft actions (`github-issue-drafter`); running evals (`live-eval-runner`); deciding regression-suite entry (`regression-promotion-recommender`).
 
 ---
 
@@ -70,7 +70,7 @@ Note secondary contributing factors in the classification; the primary category 
 | Category | Treatment |
 |---|---|
 | `BLOCK` | Fix required before proceeding; orchestrator routes to the relevant fix loop (Stage 7 / 4 / 2 by cause). |
-| `NBC` | Human release authority approval required; GitHub Issue (via `github-issue-drafter`); re-test criteria defined. |
+| `NBC` | Human release authority approval required for risk acceptance; GitHub tracking issue or decision-needed draft via `github-issue-drafter`; re-test criteria defined. |
 | `AMB` | Slice pauses; orchestrator surfaces ambiguity to human; no agent proceeds until clarified. |
 | `FLAKY` | Document and assess frequency. < 10% and not high-risk may be treated as `NBC` with human approval; > 10% escalate to `BLOCK` or re-investigate as `IMP`/`FIX`. |
 | `EDD` | Revise eval contract; route to `eval-contract-designer` before re-running. |
@@ -79,7 +79,7 @@ Note secondary contributing factors in the classification; the primary category 
 | `FIX` | Fix fixture/environment and re-run; no implementation change. |
 
 4. **Flag regression-promotion candidates** for `IMP`, `MLM`, `NBC` (and high-value `EDD` corrections once fixed). Do not decide promotion — that is `regression-promotion-recommender`.
-5. **Produce the classification report** from the template: per-failure classification + treatment, aggregate counts, GitHub Issue draft inputs (inputs only) for `BLOCK`/`NBC`/`MLM`, regression candidates, and blockers/pauses.
+5. **Produce the classification report** from the template: per-failure classification + treatment, aggregate counts, GitHub Issue inputs for `BLOCK`/`NBC`/`MLM`, regression candidates, and blockers/pauses.
 
 ---
 
@@ -100,7 +100,7 @@ Before handoff, confirm:
 - Non-blocking candidates presented as pending human approval, with re-test criteria and GitHub Issue inputs.
 - Each `AMB` failure has a specific clarification question and is not silently resolved; the gate reflects a pause.
 - No full outputs, no PHI/PII; external references used instead.
-- GitHub Issue draft inputs present for `BLOCK`/`NBC`/`MLM`; the report provides inputs only, never creates issues.
+- GitHub Issue inputs present for `BLOCK`/`NBC`/`MLM`; this classifier provides inputs only and leaves create/draft handling to `github-issue-drafter`.
 - Regression-promotion candidates flagged, not decided.
 - Gate recommendation is one of `Proceed / Fix required / Pause for clarification / Human approval required` and matches the counts (any `BLOCK` = fix required; any `AMB` = pause; any `NBC` otherwise = human approval required; none of the three = proceed); no merge recommendation, no risk acceptance.
 
@@ -112,7 +112,7 @@ See AGENTS.md cross-cutting rules (Authority and human gates; Evidence, privacy,
 
 - Downgrading a blocking failure to `NBC` without human instruction and documented rationale; treating an `AMB` failure as resolved.
 - Weakening the rubric to reclassify a failure as a pass; classifying without consulting the unsafe failure-mode register.
-- Producing GitHub Issues directly instead of draft inputs; treating high-risk flakiness as automatically acceptable.
+- Producing GitHub Issues directly instead of issue inputs; treating high-risk flakiness as automatically acceptable.
 - Contaminating the run with context from the eval run itself (isolation requirement).
 
 ---
@@ -121,7 +121,7 @@ See AGENTS.md cross-cutting rules (Authority and human gates; Evidence, privacy,
 
 - **Blocking:** orchestrator routes to the fix loop (stage by root cause); `live-eval-runner` re-runs; this skill re-classifies.
 - **Ambiguous:** orchestrator pauses and surfaces the question; after clarification, `eval-contract-designer` may revise the rubric and `live-eval-runner` re-runs.
-- **Non-blocking only:** orchestrator surfaces to human release authority; if approved, `github-issue-drafter` creates issues and `regression-promotion-recommender` (conditional) reviews candidates; then Stage 12.
+- **Non-blocking only:** orchestrator surfaces risk acceptance to the human release authority; `github-issue-drafter` creates safe tracking issues or drafts decision-needed items, and `regression-promotion-recommender` (conditional) reviews candidates; then Stage 12 after required human decisions.
 - **No failures, or all `EDD`/`FIX` with fixes applied:** orchestrator proceeds to Stage 12 (`current-state-reconciler`).
 - **Regression candidates:** `regression-promotion-recommender` (conditional, Stage 11). **High-risk tier:** `high-risk-human-review-packager` (conditional, Stage 11).
 

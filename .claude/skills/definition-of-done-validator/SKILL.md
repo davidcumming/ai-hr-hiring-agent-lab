@@ -43,12 +43,12 @@ Verify against the underlying artifacts, not the package's own assertions. Code,
 | Agent behavior verified | Live eval summary — scenarios pass or non-blocking failures accepted |
 | Cost / latency reviewed | Cost/latency section — budgets met or acknowledged |
 | High-risk review done | Human approval record from Stage 11 |
-| Non-blocking failures approved | Residual risk register — each accepted or a new draft pending Stage 16 |
+| Non-blocking failures approved | Residual risk register — each accepted by the human and tracked by a created issue or justified safe draft |
 | Docs updated | Documentation validation report — gate passed |
 | ADRs / guidelines consistent | ADR section + guideline updates |
 | Traceability complete | Matrix coverage summary — no blocking gaps |
 | Manual evidence reviewed | Manual evidence section — present or explicitly N/A |
-| Issues created | Issue summary — all gaps tracked; drafts exist for untracked gaps |
+| Issues created | Issue summary — all gaps tracked by created issues, or safe drafts with explicit reasons |
 | Manual-config debt below ceiling | Debt register or referenced debt monitor |
 | Lessons promoted | Closeout or retro note (may be conditional on Stage 18) |
 | Historical artifacts archived | Not verifiable at Stage 15 — done post-merge by `archive-package-preparer` |
@@ -68,7 +68,7 @@ For every criterion: identify the expected evidence; check it is present and suf
 Independently verify the coverage summary in the package matches the matrix artifact. Flag any numerical discrepancy.
 
 ### Step 4 — Cross-check issue tracking
-Verify every residual risk in the package is referenced by an existing open issue or by a new draft awaiting approval. Flag any with no tracking.
+Verify every residual risk in the package is referenced by an existing open issue, a newly created issue, or a safe draft with an explicit reason. Flag any with no tracking.
 
 ### Step 5 — Assess the overall state
 All Met or Conditionally met (tracked) → **Done**. One or more Not met (blocking) → **Not done** + identify the stage to return to. Conditionally met with items pending Release Authority acceptance → **Conditionally done — pending Stage 16**.
@@ -86,7 +86,7 @@ Before handoff, confirm:
 - [ ] Each "Conditionally met" names the condition and tracking issue/risk ID; each "Not met" states what is missing and the stage to return to.
 - [ ] The package's merge-readiness recommendation was not treated as verification — each criterion was assessed independently against underlying artifacts.
 - [ ] The coverage summary was verified against the traceability matrix; any discrepancy is listed, not silently resolved.
-- [ ] Every residual risk has an existing-issue reference or a pending draft; any without tracking is flagged.
+- [ ] Every residual risk has an existing issue, created issue, or safe draft with a reason; any without tracking is flagged.
 - [ ] The overall recommendation is one of three explicit states (not hedged); "Conditionally done" is not used to mask a blocking item.
 - [ ] The stage to return to is specified for any "Not done".
 - [ ] The advisory statement is included and correctly states the Release Authority approves at Stage 16.

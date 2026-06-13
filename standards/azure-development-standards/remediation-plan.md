@@ -38,7 +38,7 @@ Priority tags carried from the assessment. "Owner" = which execution agent (Sect
 - Define the schema + a template + a worked example file. → *Agent 8*
 - Orchestration Map §2: add orchestrator responsibility to **read on resume, write after every stage transition**; reference the schema. → *Agent 2*
 
-**R3 — Batch low-stakes approvals (Medium).** Process Doc §31: pre-delegate issue creation for `documentation-gap`, `test-gap`, `enhancement` (agents create with a standard label; release authority reviews the batch at Gate 3). Keep per-item approval for `security-risk`, `manual-config-debt`, `eval-failure`. → *Agent 1*
+**R3 — Treat issue creation as backlog tracking (Resolved).** Process Doc §27/§31: ordinary GitHub Issues are backlog records agents may create when safe, with created issue refs reported; human approval remains for destructive issue actions, committed-scope metadata changes, ADRs, residual-risk acceptance, merges, releases, and sensitive/publication-risk issues. → *Agent 1*
 
 **R4 — Cross-model verification (Medium).** Process Doc: at isolated-verification stages (3, 13, 15, failure-classification sanity pass), state a *preference* that verification runs on the other tool/model family from the producer. → *Agent 1*
 

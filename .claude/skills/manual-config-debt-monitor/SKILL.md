@@ -24,7 +24,7 @@ Runs at every Stage 19 invocation, regardless of whether `strategic-doc-update-r
 
 ## 3. Do Not Use This Skill For
 
-- Creating or closing GitHub Issues — `github-issue-drafter` drafts; issues close only with approved evidence.
+- Closing, deleting, reprioritizing, assigning, or milestoning GitHub Issues. Missing safe debt issues should be created or drafted through `github-issue-drafter`; issues close only with approved evidence and explicit authorization.
 - Performing manual-config evidence capture — that is `manual-config-evidence-capture` (Stage 7) and `manual-evidence-normalizer` (Stage 12).
 - Setting the debt ceiling policy — the project defines it before feature delivery (Process Doc §17.3); this skill applies it.
 
@@ -57,7 +57,7 @@ Open debt items and resolution status come from GitHub Issues (source of truth f
 
 **Step 2 — Inventory open debt.** Load all open manual-config / source-control debt Issues. Per issue record: ID and title, severity (critical / non-critical), date opened, completed slices survived, prior re-approval status, and config surface (Azure Portal / Power Platform / Copilot Studio / Foundry UI / other). Note issues closed this slice.
 
-**Step 3 — Load debt incurred this slice.** Review this slice's evidence summaries and source-control capture reports. Identify new debt items that should have Issues. If new debt exists with no Issue, flag a gap requiring issue creation before any recommendation.
+**Step 3 — Load debt incurred this slice.** Review this slice's evidence summaries and source-control capture reports. Identify new debt items that should have Issues. If new debt exists with no Issue, create safe tracking issues through `github-issue-drafter` when tooling/publication rules allow it; otherwise record a draft reason and flag the gap before any no-block recommendation.
 
 **Step 4 — Apply the ceiling check.** Compare inventory to each dimension:
 
@@ -82,7 +82,7 @@ Before handoff, confirm:
 - The debt ceiling policy is cited (with source), not assumed; if unavailable, a structural blocker is raised and no recommendation given.
 - The three ceiling dimensions are identified, with any custom thresholds recorded and sourced.
 - Every open debt issue carries a GitHub Issue ID, severity, config surface, age (slices survived), and re-approval status.
-- New debt incurred this slice is identified, and missing GitHub Issues are flagged as gaps.
+- New debt incurred this slice is identified, and missing GitHub Issues are created or intentionally drafted with reasons.
 - Debt resolved this slice is listed with resolution evidence; no issue is marked closed without evidence.
 - The ceiling check table shows all three dimensions with current counts and pass/block/review status, sourced from GitHub Issues.
 - The recommendation is exactly one of `block-next-slice`, `conditional-re-approval-required`, `no-block` — never a "maybe" — with a rationale naming the breached dimension(s).
@@ -105,4 +105,4 @@ Use `templates/manual-config-debt-report-template.md`. Recommendation value is e
 - `block-next-slice`: orchestrator stops at Stage 19 for human-directed burn-down.
 - `conditional-re-approval-required`: orchestrator surfaces aged items, waits for re-approval, then proceeds.
 
-State the ceiling policy in use, the recommendation, each dimension's pass/fail, new and resolved debt this slice, burn-down actions, aged items needing re-approval, and the referenced Issue IDs.
+State the ceiling policy in use, the recommendation, each dimension's pass/fail, new and resolved debt this slice, burn-down actions, aged items needing re-approval, and the referenced Issue IDs/URLs or draft reasons.

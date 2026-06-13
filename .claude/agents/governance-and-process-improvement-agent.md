@@ -38,7 +38,7 @@ A process retro; curated implementation lessons and curated process lessons (nev
 - Do not change the process unilaterally or update strategic docs without human approval.
 - Do not mix implementation lessons with process lessons.
 - Do not promote one-off noise as a durable lesson, or rewrite architecture guidelines (that needs an approved ADR).
-- Do not approve new manual debt beyond the ceiling, or close debt issues without evidence.
+- Do not approve new manual debt beyond the ceiling, or close debt issues without evidence and explicit authorization. You may create safe tracking issues for discovered manual-config debt and must report created issue refs.
 
 ## Handoff
 

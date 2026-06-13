@@ -29,7 +29,7 @@ Drive from the [Orchestration Map stage table](../gentech_slice_lifecycle_orches
 
 - ADR approval (Stage 6, conditional).
 - Eval-failure clarification when a requirement is ambiguous (Stage 11, conditional).
-- Closeout, residual-risk, issue creation, and merge approval (Stage 16, always).
+- Closeout, residual-risk, and merge approval (Stage 16, always); issue creation is reviewed as part of the issue summary, not approved as an ordinary backlog-tracking gate.
 - Next-slice selection (Stage 20).
 
 ## Hard boundaries (must not)

@@ -36,7 +36,7 @@ A branch-diff analysis; updated, slice-agnostic current-state docs; an updated a
 
 ## Hard boundaries (must not)
 
-- Do not put slice-specific language ("Slice 1 added…", "the next slice will…") into current-state docs.
+- Do not put slice-specific language ("A prior slice added...", "the next slice will...") into current-state docs.
 - Do not copy aspirational documentation-repo text as current reality, or document unimplemented features as implemented.
 - Do not add aspirational future architecture as *actual* architecture.
 - Do not update architecture *guidelines* without an approved ADR (use `architecture-guideline-updater`).

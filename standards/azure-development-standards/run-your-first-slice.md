@@ -28,15 +28,15 @@ The `slice-orchestrator` drives this; it pauses and asks you at the three **🛑
 
 **Reconcile the docs (Stages 12–13).** Update the current-state documentation to match what was actually built (12), then have a different agent independently validate the docs against the evidence (13).
 
-**Close it out (Stages 14–15).** Build the traceability matrix, draft (don't create) any follow-up issues, and assemble the closeout package (14), then independently validate it against the definition of done (15).
+**Close it out (Stages 14–15).** Build the traceability matrix, create safe follow-up issues (or draft them when tooling or publication risk requires it), and assemble the closeout package (14), then independently validate it against the definition of done (15).
 
-> 🛑 **Gate 3 — Closeout & merge (Stage 16, always).** You review the closeout package, residual-risk summary, and drafted issues, then approve the merge. Nothing merges without you. This is the one gate that fires on every slice.
+> 🛑 **Gate 3 — Closeout & merge (Stage 16, always).** You review the closeout package, residual-risk summary, and issue summary, then approve the merge. Nothing merges without you. This is the one gate that fires on every slice.
 
 **Wrap up (Stages 17–20).** Archive the historical artifacts (17), run the retro and capture lessons (18), update strategic docs and check the manual-config debt ceiling (19), and get a recommendation for the next slice — which **you** choose (20). Then it loops to Stage 0 for the next one.
 
 ## The one rule to remember
 
-Agents recommend; **you approve.** Every skill drafts, classifies, or recommends — residual risk, architecture decisions, issue creation, and merge are always human decisions. The full set of cross-cutting rules is in [`Skills/.agents/AGENTS.md`](./Skills/.agents/AGENTS.md).
+Agents recommend; **you approve.** Residual risk, architecture decisions, committed-scope changes, destructive issue actions, sensitive issue publication, and merge are always human decisions. Ordinary backlog issues may be created by agents, and they must report the issue refs. The full set of cross-cutting rules is in [`Skills/.agents/AGENTS.md`](./Skills/.agents/AGENTS.md).
 
 ## If something breaks in production
 

@@ -61,13 +61,13 @@ Items to pass to `manual-config-evidence-capture`, with enough detail to identif
 
 ---
 
-## 6. Recommended GitHub Issues
+## 6. GitHub Issue Tracking Candidates
 
-Recommended for feasible-but-omitted debt. Do **not** create without human approval.
+Recommended for feasible-but-omitted debt. Pass to `github-issue-drafter` to create safe tracking issues or draft when publication/tooling requires it.
 
-| Title | Type | Severity | Rationale | Related Item |
+| Title or Issue Ref | Type | Severity | Rationale | Related Item |
 |---|---|---|---|---|
-| `<title>` | `manual-config-debt` | `High / Medium / Low` | `<rationale>` | `<item from Gaps Table>` |
+| `<title or #issue>` | `manual-config-debt` | `High / Medium / Low` | `<rationale>` | `<item from Gaps Table>` |
 
 > If none: `No issues recommended for this slice.`
 

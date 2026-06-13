@@ -57,11 +57,11 @@ Code/config/IaC committed to the branch is implementation truth; portal state al
    | Not committed — export unsupported | Platform does not support export of this config. |
    | Not committed — debt | Export is feasible but not yet done. |
 
-3. **Identify gaps.** For each not-fully-committed item, assess source-control feasibility (Yes / No / Partially / Unknown). If feasible-but-omitted, it is a debt item needing a GitHub Issue recommendation. If not feasible, flag for `manual-config-evidence-capture` with the platform limitation noted. If partial, record which properties are captured and which are not.
+3. **Identify gaps.** For each not-fully-committed item, assess source-control feasibility (Yes / No / Partially / Unknown). If feasible-but-omitted, it is a debt item needing GitHub Issue tracking. If not feasible, flag for `manual-config-evidence-capture` with the platform limitation noted. If partial, record which properties are captured and which are not.
 4. **Produce the capture report** using `templates/source-control-config-capture-report-template.md`.
-5. **Recommend follow-up actions.** Debt items with feasible source control → recommend a GitHub Issue (type `manual-config-debt`). Items needing manual evidence → explicit handoff to `manual-config-evidence-capture`. Unsupported-export scenarios → note the platform limitation and flag for the closeout package.
+5. **Recommend follow-up actions.** Debt items with feasible source control → create an issue candidate for `github-issue-drafter` (type `manual-config-debt`). Items needing manual evidence → explicit handoff to `manual-config-evidence-capture`. Unsupported-export scenarios → note the platform limitation and flag for the closeout package.
 
-Never include secrets, credentials, connection strings, or SAS tokens in the report (Key Vault names and managed-identity resource IDs are fine; their values are not). This skill recommends GitHub Issues; it does not create them or approve debt. See AGENTS.md cross-cutting rules (Authority and human gates; Source of truth; Evidence, privacy, context).
+Never include secrets, credentials, connection strings, tenant/subscription IDs, or SAS tokens in the report (Key Vault names and managed-identity resource IDs are fine; their values are not). This skill produces GitHub Issue candidates for `github-issue-drafter`, which creates safe tracking issues or drafts when needed. This skill does not approve debt. See AGENTS.md cross-cutting rules (Authority and human gates; Source of truth; Evidence, privacy, context).
 
 ---
 
@@ -85,7 +85,7 @@ Before handoff, confirm:
 - All Microsoft-stack surfaces are considered (Azure, Power Platform, Copilot Studio, Foundry, GitHub Actions/pipelines).
 - Every committed IaC/solution/SDK-defined file is listed with its actual branch file path, naming the resource it represents.
 - Every gap is classified (Debt / Export Unsupported / Partially Captured / Under Investigation) with source-control feasibility assessed; partial items specify which properties are committed.
-- Every feasible-but-omitted debt item has a `manual-config-debt` GitHub Issue recommendation (not a duplicate of an open one) — recommended, not created.
+- Every feasible-but-omitted debt item has a `manual-config-debt` GitHub Issue candidate or created issue ref (not a duplicate of an open one).
 - Every manual-evidence item is listed for `manual-config-evidence-capture` with enough detail to identify the resource; the handoff is explicit.
 - Known platform export gaps are documented as limitations, not treated as debt.
 - No credentials, secrets, keys, connection strings, SAS tokens, or sensitive personal/health data appear anywhere.
