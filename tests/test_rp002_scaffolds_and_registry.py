@@ -236,6 +236,18 @@ def test_rp005_azure_blob_round_trips_record_across_app_instances(
     assert body["status"] == "completed"
     assert body["result"]["evaluation_id"] == evaluation_id
     assert body["result"]["result"]["ai_backend_type"] == "none"
+
+    body_response = client2.post(
+        "/api/evaluations/retrieve",
+        json={"evaluation_id": evaluation_id},
+        headers=HR_HEADERS,
+    )
+    assert body_response.status_code == 200
+    body_retrieve = body_response.json()
+    assert body_retrieve["status"] == "completed"
+    assert body_retrieve["result"]["evaluation_id"] == evaluation_id
+    assert body_retrieve["result"] == body["result"]
+
     assert f"evaluations/{evaluation_id}/record.json" in fake.blobs
     assert not (tmp_path / "app2" / "evaluations" / evaluation_id / "record.json").exists()
 

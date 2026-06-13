@@ -45,9 +45,18 @@ def test_committed_document_matches_regenerated_output():
 def test_routes_and_status_vocabulary_conform():
     spec = _committed_spec()
     paths = spec["paths"]
-    assert set(paths) == {"/api/evaluations", "/api/evaluations/{evaluation_id}"}
+    assert set(paths) == {
+        "/api/evaluations",
+        "/api/evaluations/retrieve",
+        "/api/evaluations/{evaluation_id}",
+    }
     assert "post" in paths["/api/evaluations"]
+    assert "post" in paths["/api/evaluations/retrieve"]
     assert "get" in paths["/api/evaluations/{evaluation_id}"]
+    assert (
+        paths["/api/evaluations/retrieve"]["post"]["operationId"]
+        == "retrieveEvaluationForCopilot"
+    )
 
     # The envelope schema's status enum is the adopted fixed vocabulary
     # (emitted four + the two declared-reserved values).
@@ -71,3 +80,9 @@ def test_routes_and_status_vocabulary_conform():
     ]["schema"]
     for field in ("position_id", "idempotency_key", "requested_rigor"):
         assert field in request_schema["properties"]
+
+    retrieve_schema = paths["/api/evaluations/retrieve"]["post"]["requestBody"][
+        "content"
+    ]["application/json"]["schema"]
+    assert set(retrieve_schema["properties"]) == {"evaluation_id"}
+    assert retrieve_schema["required"] == ["evaluation_id"]

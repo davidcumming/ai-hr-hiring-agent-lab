@@ -1,4 +1,4 @@
-"""EvaluationRequest — the POST /api/evaluations body (single schema source)."""
+"""Request-body schemas for the evaluation API."""
 
 from __future__ import annotations
 
@@ -40,3 +40,15 @@ class EvaluationRequest(BaseModel):
                     "provide candidate_ref, or both resume_text and cover_letter_text"
                 )
         return self
+
+
+class EvaluationRetrieveRequest(BaseModel):
+    """Copilot-friendly retrieve request body.
+
+    Copilot Studio topic variables bind reliably to body fields; the existing
+    path-parameter GET route remains the canonical HTTP read for other clients.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    evaluation_id: str = Field(min_length=1)

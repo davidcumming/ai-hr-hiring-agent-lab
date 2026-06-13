@@ -81,3 +81,18 @@ When updating standards, update the vendored source first, then refresh the `.ag
 - Treat code, config, IaC, approved manual evidence, and current-state docs as implementation truth. Treat slice specs as intent.
 - For Azure, Power Platform, Copilot Studio, and Foundry setup, prefer repo-first work: document the intended configuration, capture evidence for manual portal changes, and codify configuration where feasible.
 - Never commit secrets, credentials, connection strings, SAS tokens, raw applicant data, regulated personal data, or private tenant details.
+## Ignored Local/System Files
+
+Coding agents must ignore local operating-system, editor, cache, and generated metadata files unless the user explicitly asks otherwise.
+
+Never read, modify, stage, commit, summarize, or treat the following as meaningful project changes:
+
+- `.DS_Store`
+- `Thumbs.db`
+- `.Spotlight-V100/`
+- `.Trashes/`
+- editor swap/temp files
+- local cache directories
+- files already ignored by `.gitignore`
+
+When reviewing changes, base conclusions on Git-tracked project files and intentional untracked project files only. Do not include ignored local/system files in change summaries, validation reports, diffs, or commits.

@@ -31,3 +31,19 @@ Codex and Claude to the shared process, skills, and role prompts.
 - STOP and ask for human approval at every human gate: ADR approval,
   residual-risk acceptance, GitHub Issue creation, and any merge. Never merge,
   approve residual risk, create issues, or deploy Azure resources on your own.
+
+  ## Ignored Local/System Files
+
+Coding agents must ignore local operating-system, editor, cache, and generated metadata files unless the user explicitly asks otherwise.
+
+Never read, modify, stage, commit, summarize, or treat the following as meaningful project changes:
+
+- `.DS_Store`
+- `Thumbs.db`
+- `.Spotlight-V100/`
+- `.Trashes/`
+- editor swap/temp files
+- local cache directories
+- files already ignored by `.gitignore`
+
+When reviewing changes, base conclusions on Git-tracked project files and intentional untracked project files only. Do not include ignored local/system files in change summaries, validation reports, diffs, or commits.

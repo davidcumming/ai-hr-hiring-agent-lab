@@ -25,6 +25,14 @@ def test_hr_role_succeeds_on_both_endpoints(client):
     assert get_response.status_code == 200
     assert get_response.json()["status"] == "completed"
 
+    retrieve_response = client.post(
+        "/api/evaluations/retrieve",
+        json={"evaluation_id": evaluation_id},
+        headers=headers,
+    )
+    assert retrieve_response.status_code == 200
+    assert retrieve_response.json()["status"] == "completed"
+
 
 @pytest.mark.parametrize("method,path", [("post", "/api/evaluations"), ("get", "/api/evaluations/eval-x")])
 def test_missing_identity_is_401_unauthorized(client, method, path):
@@ -32,6 +40,18 @@ def test_missing_identity_is_401_unauthorized(client, method, path):
         response = client.post(path, json={"position_id": "p", "idempotency_key": "k"})
     else:
         response = client.get(path)
+    assert response.status_code == 401
+    envelope = response.json()
+    assert envelope["status"] == "unauthorized"
+    assert "unauthorized" in envelope["errors"]
+
+
+def test_missing_identity_on_body_retrieve_is_401_before_body_validation(client):
+    response = client.post(
+        "/api/evaluations/retrieve",
+        content=b"not json {",
+        headers={"Content-Type": "application/json"},
+    )
     assert response.status_code == 401
     envelope = response.json()
     assert envelope["status"] == "unauthorized"
@@ -57,6 +77,22 @@ def test_authenticated_without_hr_role_is_403_unauthorized(client, roles, method
         )
     else:
         response = client.get(path, headers=headers)
+    assert response.status_code == 403
+    assert response.json()["status"] == "unauthorized"
+
+
+@pytest.mark.parametrize(
+    "roles",
+    ["", "hiring_manager", "reviewer,auditor", "admin_lab", "made_up_role", "HR"],
+)
+def test_authenticated_without_hr_role_on_body_retrieve_is_403_unauthorized(
+    client, roles
+):
+    response = client.post(
+        "/api/evaluations/retrieve",
+        json={"evaluation_id": "eval-x"},
+        headers=identity_headers(actor_id="u-nothr-002", roles=roles),
+    )
     assert response.status_code == 403
     assert response.json()["status"] == "unauthorized"
 

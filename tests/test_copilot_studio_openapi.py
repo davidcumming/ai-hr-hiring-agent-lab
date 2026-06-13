@@ -1,8 +1,8 @@
-"""E4 Copilot Studio curated Swagger artifact checks.
+"""Copilot Studio curated Swagger artifact checks.
 
 The FastAPI OpenAPI 3.1 document remains the source API contract. The E4
 Swagger 2.0 file is a smaller custom-connector-compatible registration
-artifact with exactly the two intended actions.
+artifact with the intended Copilot-facing actions.
 """
 
 from __future__ import annotations
@@ -108,12 +108,21 @@ def test_copilot_swagger_matches_generator():
     assert result.returncode == 0, result.stderr
 
 
-def test_only_two_intended_actions_are_exposed():
+def test_only_three_intended_actions_are_exposed():
     spec = _json(COPILOT_SWAGGER_PATH)
-    assert set(spec["paths"]) == {"/api/evaluations", "/api/evaluations/{evaluation_id}"}
+    assert set(spec["paths"]) == {
+        "/api/evaluations",
+        "/api/evaluations/retrieve",
+        "/api/evaluations/{evaluation_id}",
+    }
     assert set(spec["paths"]["/api/evaluations"]) == {"post"}
+    assert set(spec["paths"]["/api/evaluations/retrieve"]) == {"post"}
     assert set(spec["paths"]["/api/evaluations/{evaluation_id}"]) == {"get"}
     assert spec["paths"]["/api/evaluations"]["post"]["operationId"] == "submitEvaluation"
+    assert (
+        spec["paths"]["/api/evaluations/retrieve"]["post"]["operationId"]
+        == "retrieveEvaluationForCopilot"
+    )
     assert (
         spec["paths"]["/api/evaluations/{evaluation_id}"]["get"]["operationId"]
         == "getEvaluation"
@@ -143,6 +152,7 @@ def test_function_key_is_header_api_key_without_committed_value():
     assert spec["security"] == [{"function_key": []}]
     for operation in (
         spec["paths"]["/api/evaluations"]["post"],
+        spec["paths"]["/api/evaluations/retrieve"]["post"],
         spec["paths"]["/api/evaluations/{evaluation_id}"]["get"],
     ):
         assert operation["security"] == [{"function_key": []}]
@@ -153,6 +163,7 @@ def test_x_lab_headers_are_visible_and_marked_temporary():
 
     for operation in (
         spec["paths"]["/api/evaluations"]["post"],
+        spec["paths"]["/api/evaluations/retrieve"]["post"],
         spec["paths"]["/api/evaluations/{evaluation_id}"]["get"],
     ):
         headers = {
@@ -177,6 +188,22 @@ def test_request_schema_has_no_backend_selection_fields():
     assert not request_fields & FORBIDDEN_REQUEST_FIELDS
     assert {"position_id", "candidate_ref", "idempotency_key"} <= request_fields
     assert {"resume_text", "cover_letter_text"}.isdisjoint(request_fields)
+    retrieve_fields = set(
+        spec["definitions"]["EvaluationRetrieveRequest"]["properties"]
+    )
+    assert retrieve_fields == {"evaluation_id"}
+
+
+def test_body_retrieve_operation_has_bindable_evaluation_id_input():
+    spec = _json(COPILOT_SWAGGER_PATH)
+    operation = spec["paths"]["/api/evaluations/retrieve"]["post"]
+    body = next(p for p in operation["parameters"] if p["in"] == "body")
+
+    assert operation["operationId"] == "retrieveEvaluationForCopilot"
+    assert body["schema"] == {"$ref": "#/definitions/EvaluationRetrieveRequest"}
+    assert "Copilot-friendly retrieve operation" in operation["description"]
+    assert "stored topic variable" in operation["description"]
+    assert "Dynamically fill with AI" not in operation["description"]
 
 
 def test_envelope_fields_match_source_contract():

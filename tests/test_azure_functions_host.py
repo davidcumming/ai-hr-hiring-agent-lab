@@ -120,6 +120,10 @@ def test_function_app_openapi_operation_ids_are_stable(function_app_module):
 
     assert spec["paths"]["/api/evaluations"]["post"]["operationId"] == "submitEvaluation"
     assert (
+        spec["paths"]["/api/evaluations/retrieve"]["post"]["operationId"]
+        == "retrieveEvaluationForCopilot"
+    )
+    assert (
         spec["paths"]["/api/evaluations/{evaluation_id}"]["get"]["operationId"]
         == "getEvaluation"
     )

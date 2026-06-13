@@ -26,7 +26,7 @@ from hr_eval_lab.api.envelope import Envelope
 from hr_eval_lab.api.errors import MalformedBodyError
 from hr_eval_lab.council.orchestrator import run_council
 from hr_eval_lab.domain import ids
-from hr_eval_lab.domain.schemas.request import EvaluationRequest
+from hr_eval_lab.domain.schemas.request import EvaluationRequest, EvaluationRetrieveRequest
 from hr_eval_lab.logging_setup import get_logger
 from hr_eval_lab.persistence import idempotency
 from hr_eval_lab.sources.fixture_store import (
@@ -39,6 +39,7 @@ logger = get_logger("api")
 router = APIRouter()
 
 _REQUEST_BODY_SCHEMA = EvaluationRequest.model_json_schema()
+_RETRIEVE_BODY_SCHEMA = EvaluationRetrieveRequest.model_json_schema()
 
 #: Readiness-pack header contract (documented in OpenAPI for tool registration).
 IDEMPOTENCY_KEY_HEADER = "Idempotency-Key"
@@ -105,6 +106,31 @@ def _record_envelope(record: dict, replayed: bool = False) -> Envelope:
         user_message=user_message,
         safe_details=safe_details,
         result=record.get("result"),
+    )
+
+
+def _retrieve_envelope(request: Request, evaluation_id: str) -> Envelope:
+    """Build the shared retrieve envelope for path- and body-based reads."""
+    record = request.app.state.store.load_record(evaluation_id)
+    if record is None:
+        return Envelope(
+            status="validation_failed",
+            user_message="Unknown evaluation id.",
+            safe_details=f"no record exists for evaluation_id '{evaluation_id}'",
+            errors=["unknown_evaluation_id"],
+        )
+    return _set_correlation_header(
+        request,
+        Envelope(
+            status="completed",
+            evaluation_id=evaluation_id,
+            correlation_id=record.get("correlation_id"),
+            user_message=(
+                "Full audit record retrieved. The contained evaluation is advisory "
+                "decision support and requires human review."
+            ),
+            result=record,
+        ),
     )
 
 
@@ -262,6 +288,47 @@ async def post_evaluation(request: Request) -> Envelope:
     )
 
 
+@router.post(
+    "/api/evaluations/retrieve",
+    response_model=Envelope,
+    operation_id="retrieveEvaluationForCopilot",
+    openapi_extra={
+        "requestBody": {
+            "required": True,
+            "content": {"application/json": {"schema": _RETRIEVE_BODY_SCHEMA}},
+        },
+        "parameters": _HEADER_PARAMS_GET,
+    },
+    summary="Retrieve one evaluation using a body-supplied id",
+    description=(
+        "Copilot-friendly retrieve operation that accepts evaluation_id as a "
+        "request body field so Copilot Studio topics can bind a stored topic "
+        "variable into the tool input. Returns the same standard envelope as "
+        "GET /api/evaluations/{evaluation_id} and requires the 'hr' role."
+    ),
+)
+async def retrieve_evaluation_for_copilot(request: Request) -> Envelope:
+    # 1. Auth first (raises 401/403 before body parsing).
+    authenticate_and_authorize(request)
+
+    # 2. Malformed body -> HTTP 400.
+    try:
+        body = await request.json()
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        raise MalformedBodyError("request body is not valid JSON")
+    if not isinstance(body, dict):
+        raise MalformedBodyError("request body must be a JSON object")
+    try:
+        retrieve_request = EvaluationRetrieveRequest.model_validate(body)
+    except ValidationError as exc:
+        fields = "; ".join(
+            f"{'.'.join(str(p) for p in e['loc'])}: {e['type']}" for e in exc.errors()
+        )
+        raise MalformedBodyError(f"invalid request shape: {fields}")
+
+    return _retrieve_envelope(request, retrieve_request.evaluation_id)
+
+
 @router.get(
     "/api/evaluations/{evaluation_id}",
     response_model=Envelope,
@@ -278,24 +345,4 @@ async def get_evaluation(evaluation_id: str, request: Request) -> Envelope:
     # 1. Auth first.
     authenticate_and_authorize(request)
 
-    record = request.app.state.store.load_record(evaluation_id)
-    if record is None:
-        return Envelope(
-            status="validation_failed",
-            user_message="Unknown evaluation id.",
-            safe_details=f"no record exists for evaluation_id '{evaluation_id}'",
-            errors=["unknown_evaluation_id"],
-        )
-    return _set_correlation_header(
-        request,
-        Envelope(
-            status="completed",
-            evaluation_id=evaluation_id,
-            correlation_id=record.get("correlation_id"),
-            user_message=(
-                "Full audit record retrieved. The contained evaluation is advisory "
-                "decision support and requires human review."
-            ),
-            result=record,
-        ),
-    )
+    return _retrieve_envelope(request, evaluation_id)
