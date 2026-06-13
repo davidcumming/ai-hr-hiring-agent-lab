@@ -12,12 +12,20 @@ deterministic business contract (identity, authorization, validation,
 idempotency, source integrity, gates, schema validation of role outputs,
 persistence, response envelope), driving a **council orchestrator** whose
 model-backed roles execute only through a **provider seam**, persisting
-through a **storage backend seam** to the local filesystem. The repository
-now includes an Azure Functions ASGI host wrapper that can deploy this same
-facade to the already-created lab Function App, but this codebase does not
-create, manage, or configure Azure resources. Real subscription IDs, tenant
-IDs, object IDs, client IDs, endpoints, keys, and secrets remain out of source
-control. Every Foundry/storage-shaped live component remains fail-closed.
+through a **storage backend seam** to the local filesystem by default or to
+Azure Blob for explicitly configured hosted evaluation records/artifacts. The
+repository now includes an Azure Functions ASGI host wrapper that can deploy
+this same facade to the already-created lab Function App, but this codebase
+does not create, manage, or configure Azure resources. Real subscription IDs,
+tenant IDs, object IDs, client IDs, endpoints, keys, and secrets remain out
+of source control. Foundry-shaped live components remain fail-closed.
+
+A manual Copilot Studio lab configuration exists outside source control for
+one synthetic topic workflow. It uses the curated Power Platform custom
+connector contract, stores the returned `evaluation_id` in
+`submitted_evaluation_id`, and calls the body-based retrieve wrapper. This is
+actual manual portal configuration evidence, not source-controlled Copilot
+ALM or production integration.
 
 ```
 CLI (httpx)        any HTTP client
@@ -56,11 +64,15 @@ CLI (httpx)        any HTTP client
             │                         → temp/HRHA_PERSISTENCE_ROOT
             │                           [Function wrapper smoke path]
             └─ AzureBlobBackend (persistence/azure_blob_backend.py)
-                 [non-functional scaffold; fails closed]
+                 [explicit hosted record/artifact backend; guarded]
    review queue row builder (review_queue.py)
    logging + never-log redaction (logging_setup.py)
    domain schemas (domain/schemas/: request, council, evaluation,
                    provider, audit, storage, transcript; domain/ids.py)
+
+Copilot Studio manual lab topic
+   -> Power Platform custom connector (curated Swagger; manual portal config)
+   -> Azure Functions ASGI wrapper / FastAPI facade
 ```
 
 ## 2. Module map (`src/hr_eval_lab/`)
@@ -69,7 +81,7 @@ CLI (httpx)        any HTTP client
 |---|---|
 | Root `function_app.py` | Azure Functions Python ASGI wrapper around the existing FastAPI app factory. It loads normal config, overrides `persistence.root` to `HRHA_PERSISTENCE_ROOT` or a temp directory, and overlays Azure Blob storage app settings only when `HRHA_STORAGE_BACKEND=azure_blob`; no routes, business logic, or Foundry behavior are added here. |
 | Root `host.json` / `.funcignore` / `requirements.txt` | Function host route-prefix config, deployment ignore hygiene, and Azure Functions deployment dependencies. |
-| `api/` | App factory, routes (POST/GET `/api/evaluations`, operation IDs `submitEvaluation`/`getEvaluation`), simulated auth, envelope, HTTP/error mapping, `Idempotency-Key` header handling, `X-Correlation-Id` request/response header. |
+| `api/` | App factory, routes (`POST /api/evaluations` / `submitEvaluation`, `GET /api/evaluations/{evaluation_id}` / `getEvaluation`, `POST /api/evaluations/retrieve` / `retrieveEvaluationForCopilot`), simulated auth, envelope, HTTP/error mapping, `Idempotency-Key` header handling, `X-Correlation-Id` request/response header. |
 | `cli.py` | Thin HTTP client (stdlib + httpx only — no application imports). |
 | `config.py` | Typed, validated view of `config/lab-config.toml` (pydantic, `extra="forbid"`); provider-ID/backend-family consistency validation; storage backend selection; Foundry/provider env guard readers (`HRHA_ENABLE_LIVE_AZURE`, `HRHA_PROVIDER_KILL_SWITCH`) plus the storage-specific `HRHA_ENABLE_AZURE_STORAGE`; `tomllib` with `tomli` fallback on Python 3.10. |
 | `council/` | 11-role registry and Mode A/B/C tables, synchronous orchestrator, deterministic code roles. |
@@ -116,11 +128,20 @@ CLI (httpx)        any HTTP client
 
 - **OpenAPI**: `openapi/evaluations-api.json`, generated from the app factory
   by `scripts/export_openapi.py`; `--check` exits non-zero on drift
-  (verified clean 2026-06-11; also a CI step and a test). Stable operation
-  IDs `submitEvaluation` / `getEvaluation`; documented request headers
-  `Idempotency-Key` (POST) and `X-Correlation-Id` (POST/GET); the request
-  schema exposes no provider/model/deployment/endpoint/agent field
-  (test-pinned).
+  (verified clean 2026-06-13; also a CI step and a test). Stable operation
+  IDs `submitEvaluation`, `getEvaluation`, and
+  `retrieveEvaluationForCopilot`; documented request headers
+  `Idempotency-Key` (submit POST) and `X-Correlation-Id` (submit POST, body
+  retrieve POST, and GET); the request schema exposes no
+  provider/model/deployment/endpoint/agent field (test-pinned).
+- **Copilot Swagger**:
+  `openapi/copilot-studio/evaluations-tool.swagger.json`, generated by
+  `scripts/export_copilot_openapi.py`; `--check` exits non-zero on drift. It
+  is a Swagger 2.0 custom-connector artifact separate from the OpenAPI 3.1
+  source contract. It exposes exactly three Copilot-facing actions:
+  `submitEvaluation`, `getEvaluation`, and
+  `retrieveEvaluationForCopilot`. The retrieve wrapper accepts only body
+  field `evaluation_id`; the canonical GET route remains available.
 - **Provider contract**: single schema source for all backends
   (`domain/schemas/provider.py`): `PROVIDER_CONTRACT_VERSION = "1.0"`,
   `ORCHESTRATION_VERSION = "council-composition-v1"`; nullable
@@ -160,12 +181,12 @@ CLI (httpx)        any HTTP client
   JSON), `ReviewQueue.jsonl` (one mandatory entry per evaluation).
 
 The layout intentionally mirrors a blob + table-storage design so that a
-future swap targets configuration rather than restructuring. E3 implements
-the first narrow Azure storage path: `AzureBlobBackend` can persist the full
-evaluation record and artifact projections to Blob when explicitly selected
-and `HRHA_ENABLE_AZURE_STORAGE=true`. It does not import Azure SDKs on the
-local default path and rejects connection strings, account keys, SAS tokens,
-and SAS-in-URL query strings.
+future swap targets configuration rather than restructuring. The current
+narrow Azure storage path lets `AzureBlobBackend` persist the full evaluation
+record and artifact projections to Blob when explicitly selected and
+`HRHA_ENABLE_AZURE_STORAGE=true`. It does not import Azure SDKs on the local
+default path and rejects connection strings, account keys, SAS tokens, and
+SAS-in-URL query strings.
 
 When imported through `function_app.py`, `persistence.root` is overridden to
 `HRHA_PERSISTENCE_ROOT` or `<tempdir>/hrha-lab-data` for local JSONL
@@ -205,7 +226,7 @@ reconciliation remain deferred.
 | `scripts/vendor_fixtures.py` | Dev-time fixture vendoring/hash refresh. |
 | `scripts/run_council_local.py` | Local deterministic council demo: one synthetic candidate strictly through the in-process HTTP facade; writes the artifact tree; prints a safe summary only (ids, statuses, counts — never document or prompt text). |
 | `scripts/smoke_foundry_config.py` | Disabled-by-default config smoke scaffold; double-guarded (`HRHA_ENABLE_LIVE_AZURE=true` **and** `--live`); no SDK import and no network in the default path; fails safely (exit 2, clear config error) if the live path is requested — live checks are not implemented. |
-| `scripts/smoke_storage_config.py` | Disabled-by-default storage config smoke. The default path performs no network I/O and sanity-checks the local filesystem backend in a temp dir. The explicit live-storage config path requires `HRHA_ENABLE_AZURE_STORAGE=true` and `--live`, checks `HRHA_STORAGE_BACKEND=azure_blob` plus Blob account URL/container, and does not require Table endpoint for E3. |
+| `scripts/smoke_storage_config.py` | Disabled-by-default storage config smoke. The default path performs no network I/O and sanity-checks the local filesystem backend in a temp dir. The explicit live-storage config path requires `HRHA_ENABLE_AZURE_STORAGE=true` and `--live`, checks `HRHA_STORAGE_BACKEND=azure_blob` plus Blob account URL/container, and does not require Table endpoint for the current Blob-only storage path. |
 
 ## 8. Infrastructure-as-code skeleton (placeholders only — nothing deployed)
 
@@ -215,10 +236,11 @@ values only (`<...>` / `TODO-...`); no real tenant/subscription IDs,
 endpoints, object IDs, or secrets; identity-based access (managed identity +
 RBAC) is the documented pattern — never keys, connection strings, or SAS
 tokens. Manually provisioned Azure lab resources exist out-of-band, including
-the target Function App for the wrapper smoke test; this repository still does
-not provision or manage those resources. Complete Azure Table-backed storage,
-Foundry, Entra auth, and Copilot Studio registration remain later
-human-gated slices.
+the target Function App for the wrapper smoke test and one Copilot Studio lab
+topic/custom-connector configuration; this repository still does not
+provision or manage those resources. Complete Azure Table-backed storage,
+Foundry, Entra auth, source-controlled Copilot ALM/export, and production
+Copilot Studio integration remain later human-gated slices.
 
 ## 9. CI
 
@@ -257,8 +279,14 @@ nothing below should be read as implemented:
   retention/recovery, and reconciliation remain local/deferred.
 - **No prompt execution** — prompt templates are recorded provenance only;
   no prompt text is ever sent to any model.
-- **No Copilot Studio** surface or configuration (a registration-readiness
-  doc exists: `docs/integration/copilot-studio-tool-readiness.md`).
+- **No source-controlled or production Copilot Studio integration** — one
+  manual lab topic workflow exists for the synthetic
+  `submitEvaluation` -> `submitted_evaluation_id` ->
+  `retrieveEvaluationForCopilot` path, with `submitEvaluation` and
+  `retrieveEvaluationForCopilot` available only when referenced by topics or
+  agents. There is no Copilot ALM export, durable screenshot/export/transcript
+  artifact, general multi-candidate workflow, production identity, or
+  production readiness claim.
 - **No Entra / real identity** — identity is simulated lab headers only.
 - **No live model evaluations** — LE-001…LE-007 exist only as skipping stubs.
 - **No admin configuration surface or config-change audit** — config is a

@@ -22,6 +22,9 @@ model call is involved anywhere in the runtime path. The normal local app
 uses local filesystem persistence. The Azure Functions wrapper can explicitly
 overlay Azure Blob persistence for evaluation audit records/artifacts when
 `HRHA_STORAGE_BACKEND=azure_blob` and `HRHA_ENABLE_AZURE_STORAGE=true`.
+The API exposes `submitEvaluation`, the canonical explicit-ID
+`getEvaluation`, and the body-based `retrieveEvaluationForCopilot` wrapper
+for Copilot Studio topic-variable binding.
 
 Foundry-facing surfaces exist only as **fail-closed, non-functional
 scaffolds**: the three Foundry provider scaffolds raise safe configuration
@@ -39,10 +42,19 @@ Every result is advisory decision support: `decision_support_only = true` and
 fields in `src/hr_eval_lab/domain/schemas/evaluation.py`), and every
 evaluation produces a human-review queue entry.
 
+A manual Copilot Studio lab configuration exists for one synthetic
+topic-driven workflow. The topic calls `submitEvaluation`, stores the returned
+`evaluation_id` in `submitted_evaluation_id`, then calls
+`retrieveEvaluationForCopilot` with that stored value bound to body field
+`evaluation_id`. The workflow returns an advisory/audit summary only. The
+portal configuration is partial note-based evidence; no source-controlled
+Copilot ALM export, durable screenshot/export/transcript, production identity,
+or live Foundry execution exists.
+
 A deterministic test suite (`tests/`, DT-001…DT-018 plus RP and smoke
-coverage) covers the behavior described here: 176 tests pass, 7 live-eval
+coverage) covers the behavior described here: 200 tests pass, 7 live-eval
 stubs skip with a documented deferral rationale, 0 fail (verified run,
-2026-06-12).
+2026-06-13).
 
 ## Documents in this folder
 
@@ -66,12 +78,14 @@ stubs skip with a documented deferral rationale, 0 fail (verified run,
   record intent and delivery history; when they disagree with code, tests, or
   these current-state docs, the code and tests win.
 - **Integration:** [`../integration/README.md`](../integration/README.md)
-  records that **no live integration exists** — only in-code seams,
-  fail-closed scaffolds, and a deferred, unapproved ADR draft.
+  records the narrow lab integrations that exist — Azure Functions hosting,
+  explicit Blob-backed evaluation-record persistence, the curated Copilot
+  Swagger artifact, and one manually configured synthetic Copilot Studio
+  topic workflow — while preserving the boundaries around no production
+  identity, no live Foundry, and no source-controlled Copilot ALM export.
   [`../integration/copilot-studio-tool-readiness.md`](../integration/copilot-studio-tool-readiness.md)
-  records what the implemented API contract already provides for a future
-  Copilot Studio tool registration (documentation only; no portal
-  configuration exists).
+  records the implemented Copilot-facing action contract and manual
+  configuration caveats.
 
 ## Maintenance rule
 

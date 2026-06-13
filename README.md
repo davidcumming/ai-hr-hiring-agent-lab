@@ -26,12 +26,13 @@ The first-project policy and architecture documents are in `standards/azure-deve
 
 This checkout contains a working, fully local Candidate Evaluation Council application alongside the vendored standards:
 
-- `src/hr_eval_lab/` - FastAPI facade, 11-role council orchestration (Modes A/B/C), rigor/escalation/quality-gate logic, deterministic mock AI provider behind a provider seam, local audit-record persistence, explicit Azure Blob evaluation-record persistence for the Function App path, and a thin CLI.
-- `tests/` - deterministic suite DT-001..DT-018 plus RP and smoke coverage (176 passing); `tests/live_evals/` holds deferred live-eval stubs that skip.
-- `openapi/evaluations-api.json` - the committed API contract, drift-checked against the app factory by `scripts/export_openapi.py --check`.
+- `src/hr_eval_lab/` - FastAPI facade, 11-role council orchestration (Modes A/B/C), rigor/escalation/quality-gate logic, deterministic mock AI provider behind a provider seam, local audit-record persistence, explicit Azure Blob evaluation-record persistence for the Function App path, the canonical explicit-ID read plus a Copilot-friendly body-based retrieve wrapper, and a thin CLI.
+- `tests/` - deterministic suite DT-001..DT-018 plus RP, Copilot Swagger, and smoke coverage (200 passing); `tests/live_evals/` holds deferred live-eval stubs that skip.
+- `openapi/evaluations-api.json` - the committed source API contract, drift-checked against the app factory by `scripts/export_openapi.py --check`.
+- `openapi/copilot-studio/evaluations-tool.swagger.json` - the curated Copilot Studio / Power Platform Swagger 2.0 artifact, drift-checked by `scripts/export_copilot_openapi.py --check`; it exposes `submitEvaluation`, `getEvaluation`, and `retrieveEvaluationForCopilot`.
 - `config/lab-config.toml`, `fixtures/` (synthetic, hash-pinned), `scripts/`, and `.github/workflows/ci.yml`.
 - `docs/product-current-state/` and `docs/architecture/` - what the system does and what is physically built; `docs/delivery/slices/` - per-slice planning and delivery artifacts.
 
-This repo still **does not create Azure resources and has no live AI backend, no Copilot Studio surface, and no Entra integration**. The narrow Azure Blob storage path is for already-created lab resources and keeps the deterministic mock provider; the Foundry provider seam exists only as a non-functional stub gated behind a deferred, unapproved ADR (see `docs/integration/README.md`).
+This repo still **does not create Azure resources and has no live AI backend, no production Copilot Studio surface, and no Entra integration**. The narrow Azure Blob storage path is for already-created lab resources and keeps the deterministic mock provider. A manual Copilot Studio lab configuration exists for one synthetic topic workflow: `submitEvaluation` stores `submitted_evaluation_id`, then `retrieveEvaluationForCopilot` retrieves the same advisory/audit record by body field `evaluation_id`. That portal state is partial note-based evidence only; there is no source-controlled Copilot ALM export, durable screenshot/export/transcript, production identity, or live Foundry execution.
 
 Use the vendored process to plan further Copilot Studio, Azure AI Foundry, Azure Functions, storage, search, identity, and evaluation work as slices.

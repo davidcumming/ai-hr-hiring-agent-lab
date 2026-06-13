@@ -4,7 +4,7 @@ Present-tense reference for what the system does today. Sources: the modules
 under `src/hr_eval_lab/`, `config/lab-config.toml`, `fixtures/`,
 `openapi/evaluations-api.json`, and the deterministic test suite under
 `tests/` (DT-001…DT-018 plus the RP storage/provider/prompt/contract suite;
-146 passed / 7 deferred-live-eval skips / 0 failed, verified 2026-06-11).
+200 passed / 7 deferred-live-eval skips / 0 failed, verified 2026-06-13).
 Claims that rest on code inspection alone (no dedicated test) are flagged
 inline.
 
@@ -22,15 +22,17 @@ Everything runs locally and deterministically:
   (`providers/mock.py`); identical inputs produce byte-identical records after
   normalizing run identity (evaluation id, derived correlation id, two
   timestamps) — DT-002.
-- There is **no live model**, no Azure resource, no Entra identity, no
-  Copilot Studio surface, and no network dependency in the runtime path.
-  Azure/Foundry-shaped scaffolds exist (a provider registry with three
-  fail-closed Foundry provider scaffolds, a fail-closed Azure Blob storage
-  scaffold, and a placeholder-only `infra/` skeleton), but every one of them
-  is non-functional by design and raises a safe configuration error on any
-  use (see §13, §15 and
-  `../architecture/provider-and-storage-seams.md`). Live Foundry/Azure
-  wiring is deferred and human-gated.
+- There is **no live model**, no repo-created Azure resource, no Entra
+  identity, no production Copilot Studio surface, and no network dependency
+  in the normal local runtime path. The Azure Functions wrapper and
+  Azure Blob backend support already-created lab resources when explicitly
+  configured. A manual Copilot Studio lab topic exists for one synthetic
+  submit/store/retrieve workflow; it remains note-evidenced portal
+  configuration, not source-controlled ALM or production integration. Foundry
+  scaffolds remain non-functional by design and raise safe configuration
+  errors on any use (see §13, §15 and
+  `../architecture/provider-and-storage-seams.md`). Live Foundry wiring is
+  deferred and human-gated.
 
 ## 2. HTTP API
 
@@ -45,19 +47,20 @@ spec validation in the test suite.
 | Method | Path | Operation ID | Purpose |
 |---|---|---|---|
 | `POST` | `/api/evaluations` | `submitEvaluation` | Submit one candidate evaluation to the council. |
-| `GET` | `/api/evaluations/{evaluation_id}` | `getEvaluation` | Retrieve the persisted full audit record. |
+| `POST` | `/api/evaluations/retrieve` | `retrieveEvaluationForCopilot` | Retrieve the persisted full audit record using a JSON body field `evaluation_id`; this is the Copilot-friendly topic-variable binding shape. |
+| `GET` | `/api/evaluations/{evaluation_id}` | `getEvaluation` | Retrieve the persisted full audit record by explicit path `evaluation_id`; this remains the canonical HTTP read for explicit-ID clients. |
 
 ### Request headers
 
 | Header | Endpoints | Behavior |
 |---|---|---|
 | `Idempotency-Key` | POST | Equivalent to the body field `idempotency_key`. At least one of the two is required (neither → HTTP 400); if both are present they must be identical (mismatch → HTTP 400). |
-| `X-Correlation-Id` | POST, GET | Optional caller-supplied correlation id. The response carries an `X-Correlation-Id` header when an envelope correlation id exists (completed/blocked/replayed POST, successful GET — the server-assigned id, also present in the envelope) or when the caller supplied the header (echoed back). Early-failure responses (HTTP 400/401/403 and `validation_failed` envelopes with no assigned correlation id) carry the header only if the caller sent one. |
+| `X-Correlation-Id` | POST submit, POST retrieve, GET | Optional caller-supplied correlation id. The response carries an `X-Correlation-Id` header when an envelope correlation id exists (completed/blocked/replayed POST submit, successful GET or body-based retrieve — the server-assigned id, also present in the envelope) or when the caller supplied the header (echoed back). Early-failure responses (HTTP 400/401/403 and `validation_failed` envelopes with no assigned correlation id) carry the header only if the caller sent one. |
 
 The request schema contains **no** provider/model/deployment/endpoint/agent
 field — provider selection is server-side configuration only (test-pinned).
 
-### Request body (POST)
+### Request body (`POST /api/evaluations`)
 
 `EvaluationRequest` (`domain/schemas/request.py`, `extra="forbid"`):
 
@@ -69,6 +72,14 @@ field — provider selection is server-side configuration only (test-pinned).
 | `idempotency_key` | optional in the schema | An idempotency key is still mandatory per request — supplied via this body field or the `Idempotency-Key` header (see §9). |
 | `evaluation_question` | no | Free-text focus question; scanned for instruction-like content (§7). |
 | `requested_rigor` | no | **Advisory only**; can never lower the server-resolved rigor (§5). |
+
+### Request body (`POST /api/evaluations/retrieve`)
+
+`EvaluationRetrieveRequest` (`domain/schemas/request.py`, `extra="forbid"`):
+
+| Field | Required | Notes |
+|---|---|---|
+| `evaluation_id` | yes | The evaluation id returned by `submitEvaluation`. The body field exists so Copilot Studio topic/workflow variables can bind the stored id into the retrieve action without relying on path-parameter persistence. |
 
 ### Response envelope
 
@@ -86,12 +97,12 @@ emitted** (DT-007).
 | Condition | HTTP | Envelope status |
 |---|---|---|
 | Business outcome (success, gate-blocked, semantic validation failure) | 200 | `completed` / `blocked` / `validation_failed` |
-| Malformed body (invalid JSON, non-object, schema-invalid shape) or missing/mismatched idempotency key | 400 | none — body is `{"error": "malformed_request_body", "detail": …}`; detail carries field locations/types only, never values |
+| Malformed body (invalid JSON, non-object, schema-invalid shape) or missing/mismatched submit idempotency key | 400 | none — body is `{"error": "malformed_request_body", "detail": …}`; detail carries field locations/types only, never values |
 | Missing/empty identity header | 401 | `unauthorized` |
 | Authenticated caller without the `hr` role | 403 | `unauthorized` |
 | 409 / 422 | never used | — |
 
-### Order of operations (POST handler, `api/routes_evaluations.py`)
+### Order of operations (submit handler, `api/routes_evaluations.py`)
 
 1. Authentication + role authorization (short-circuits everything; DT-009).
 2. Malformed-body rejection → HTTP 400 (includes idempotency-key
@@ -104,8 +115,44 @@ emitted** (DT-007).
 6. Evidence packet build → council orchestration → gates → persistence →
    envelope.
 
-`GET` returns the full persisted audit record inside `result` (status
-`completed`), or `validation_failed` for an unknown id.
+The two retrieve handlers share `_retrieve_envelope()`. Both authenticate and
+authorize first. `POST /api/evaluations/retrieve` then validates the
+body-supplied `evaluation_id`; malformed JSON, missing `evaluation_id`, or an
+extra field returns HTTP 400. The shared retrieve behavior returns the full
+persisted audit record inside `result` (status `completed`), or
+`validation_failed` for an unknown id.
+
+### Copilot-facing action contract and lab topic workflow
+
+The curated Swagger 2.0 artifact
+`openapi/copilot-studio/evaluations-tool.swagger.json` is generated by
+`scripts/export_copilot_openapi.py --check` and is separate from the source
+OpenAPI 3.1 contract. It exposes exactly three Copilot-facing actions:
+`submitEvaluation`, `getEvaluation`, and `retrieveEvaluationForCopilot`.
+The submit request remains fixture-reference-only for Copilot Studio
+registration: `position_id`, `candidate_ref`, optional `idempotency_key`,
+optional `evaluation_question`, and optional `requested_rigor`; inline resume
+and cover-letter text are not exposed in the curated connector artifact.
+
+A manual Copilot Studio lab topic workflow exists for one synthetic sample
+candidate path:
+
+1. The topic calls `submitEvaluation` for `pos-sample-001` /
+   `cand-sample-001`.
+2. The topic stores the returned `evaluation_id` in
+   `submitted_evaluation_id`.
+3. The topic calls `retrieveEvaluationForCopilot` with
+   `submitted_evaluation_id` bound to body field `evaluation_id`.
+4. The response renders an advisory evaluation/audit summary and preserves
+   the human-review-required boundary.
+
+The Copilot Studio tool availability setting for `submitEvaluation` and
+`retrieveEvaluationForCopilot` is `Only when referenced by topics or agents`
+so the topic controls the stateful workflow instead of broad standalone tool
+routing pre-empting it. Manual evidence for this workflow is partial and
+note-based: there is no source-controlled Copilot ALM export, durable
+screenshot/export/transcript, production identity, live Foundry execution, or
+multi-candidate workflow evidence.
 
 ## 3. Authentication and authorization (simulated)
 
@@ -306,7 +353,7 @@ Authentication is identity-based only (managed identity in Azure, explicit
 developer credential only for a live-storage smoke path). Connection strings,
 account keys, SAS tokens, and SAS-in-URL query strings are rejected.
 
-E3 boundary: hosted POST-then-GET durability is provided for the full
+Current Blob boundary: hosted POST-then-GET durability is provided for the full
 evaluation audit record. Idempotency rows, evidence JSONL rows, review queue
 rows, and Azure Table Storage system-of-record behavior remain local/deferred
 unless a later slice implements Table-backed persistence.
@@ -363,7 +410,7 @@ the response envelope to stdout.
 | `provider.ai_backend_type` | `none \| foundry_agents` (legacy family value; must agree with `provider_id` — mismatch is a config error) | `none` |
 | `persistence.root` | path | `var/lab-data` |
 | `storage.backend` | `local_filesystem \| azure_blob` | `local_filesystem` |
-| `storage.azure.account_url` / `.container` / `.table_endpoint` | placeholder strings (`table_endpoint` optional for E3) | empty (placeholders) |
+| `storage.azure.account_url` / `.container` / `.table_endpoint` | placeholder strings (`table_endpoint` optional for the current Blob-only storage path) | empty (placeholders) |
 
 Server-side environment guards exist (read at resolution time, never stored in
 records, never reachable from request bodies):
@@ -416,7 +463,7 @@ carries prompt provenance without any prompt being sent anywhere.
 | Script | Behavior |
 |---|---|
 | `scripts/run_council_local.py` | Local deterministic council demo: runs one synthetic candidate (`cand-sample-001` / `pos-sample-001`) strictly through the in-process HTTP facade (no privileged side door), writes the artifact tree under a demo data root, and prints a **safe summary only** — identifiers, statuses, counts, artifact names/hashes; never resume text, prompts, or model I/O. |
-| `scripts/smoke_storage_config.py` | Disabled-by-default storage-config smoke. Default path sanity-checks the local filesystem backend in a temp dir, exits 0 with a SKIPPED message, imports no Azure SDK, and performs no network I/O. The explicit live-storage config path requires **both** `HRHA_ENABLE_AZURE_STORAGE=true` and `--live`, validates `HRHA_STORAGE_BACKEND=azure_blob` plus Blob account URL/container, and does not require Table Storage for E3. Hosted POST/GET is the connectivity smoke. |
+| `scripts/smoke_storage_config.py` | Disabled-by-default storage-config smoke. Default path sanity-checks the local filesystem backend in a temp dir, exits 0 with a SKIPPED message, imports no Azure SDK, and performs no network I/O. The explicit live-storage config path requires **both** `HRHA_ENABLE_AZURE_STORAGE=true` and `--live`, validates `HRHA_STORAGE_BACKEND=azure_blob` plus Blob account URL/container, and does not require Table Storage for the current Blob-only storage path. Hosted POST/GET is the connectivity smoke. |
 | `scripts/smoke_foundry_config.py` | Same double-guarded pattern for Foundry configuration: default path reports guard/placeholder status and exits 0 SKIPPED; the live path fails safely — live checks are not implemented. |
 | `scripts/export_openapi.py` | Regenerates/drift-checks `openapi/evaluations-api.json`. |
 | `scripts/vendor_fixtures.py` | Dev-time fixture vendoring/hash refresh. |
@@ -463,7 +510,7 @@ script's stdout is test-verified to contain no resume or prompt text.
   OpenAPI + header behavior; CLI demo + smoke scripts).
   `tests/live_evals/test_le_stubs.py` holds LE-001…LE-007 stubs that **skip**
   with a documented rationale (no live model behavior exists to evaluate).
-  Verified result (2026-06-11): 146 passed, 7 skipped, 0 failed.
+  Verified result (2026-06-13): 200 passed, 7 skipped, 0 failed.
 - `.github/workflows/ci.yml` — on PR and push to main: Python 3.10,
   `pip install -e ".[dev]"`, `pytest -q`, and the OpenAPI drift check. No
   cloud credentials, no deployment.
@@ -478,7 +525,7 @@ script's stdout is test-verified to contain no resume or prompt text.
   result's limitations list says so. The Foundry provider scaffolds are
   non-functional placeholders; live model wiring is deferred and human-gated
   (unapproved ADR draft + BQ-005 region approval). Azure Blob storage is the
-  narrow exception for E3 record/artifact durability and does not enable any
+  narrow exception for record/artifact durability and does not enable any
   live AI behavior.
 - **Prompt templates are provenance only.** No prompt is ever executed; the
   registry exists so the audit trail and the future live backend share one
@@ -490,8 +537,19 @@ script's stdout is test-verified to contain no resume or prompt text.
 - **No admin/config surface.** Rigor, escalation, provider, and storage
   settings are changeable only by editing the source-controlled config file
   (plus the two server-side env guards); no change-audit subsystem exists.
-- **Local filesystem persistence only.** No Azure storage, no retention
-  policy, no cleanup tooling for `var/lab-data`.
+- **Storage durability is narrow.** The normal local default is still local
+  filesystem persistence. The Azure Blob path can persist full evaluation
+  records and artifact projections for explicitly configured hosted
+  evaluation flows, but Azure Table-backed idempotency/evidence/review-queue
+  rows, retention/recovery, reconciliation, and cleanup tooling remain
+  deferred.
+- **Copilot Studio evidence is manual and narrow.** The lab has one
+  note-evidenced synthetic topic workflow that submits, stores
+  `submitted_evaluation_id`, retrieves by body field `evaluation_id`, and
+  renders an advisory/audit summary. There is no source-controlled Copilot
+  ALM export, durable screenshot/export/transcript, production identity,
+  real applicant data, multi-candidate case workflow, or live Foundry
+  execution.
 - **Trigger thresholds are first-cut constants**; no calibration mechanism
   exists.
 - **Reserved envelope statuses** `needs_input`/`error` and HTTP 409 are
