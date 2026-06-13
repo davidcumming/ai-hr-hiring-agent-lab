@@ -284,6 +284,59 @@
         "summary": "Submit one candidate evaluation to the Calibrated Evaluation Council"
       }
     },
+    "/api/evaluations/retrieve": {
+      "post": {
+        "description": "Copilot-friendly retrieve operation that accepts evaluation_id as a request body field so Copilot Studio topics can bind a stored topic variable into the tool input. Returns the same standard envelope as GET /api/evaluations/{evaluation_id} and requires the 'hr' role.",
+        "operationId": "retrieveEvaluationForCopilot",
+        "parameters": [
+          {
+            "description": "Optional caller-supplied correlation id, echoed on the response. The server-assigned correlation id of the evaluation is returned in the response envelope and in this response header.",
+            "in": "header",
+            "name": "X-Correlation-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "description": "Copilot-friendly retrieve request body.\n\nCopilot Studio topic variables bind reliably to body fields; the existing\npath-parameter GET route remains the canonical HTTP read for other clients.",
+                "properties": {
+                  "evaluation_id": {
+                    "minLength": 1,
+                    "title": "Evaluation Id",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "evaluation_id"
+                ],
+                "title": "EvaluationRetrieveRequest",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Retrieve one evaluation using a body-supplied id"
+      }
+    },
     "/api/evaluations/{evaluation_id}": {
       "get": {
         "description": "Returns the persisted full audit record (every intermediate council output, rigor resolution, triggers, gate results, actor identity and role context) wrapped in the standard envelope. Requires the 'hr' role.",

@@ -148,3 +148,15 @@ def test_post_then_get_full_envelope(client):
         assert metadata["role_schema_version"]
         assert execution["retry_count"] == 0
         assert execution["schema_valid"] is True
+
+    body_retrieve = client.post(
+        "/api/evaluations/retrieve",
+        json={"evaluation_id": evaluation_id},
+        headers=HR_HEADERS,
+    )
+    assert body_retrieve.status_code == 200
+    body_envelope = body_retrieve.json()
+    assert body_envelope["status"] == "completed"
+    assert body_envelope["evaluation_id"] == evaluation_id
+    assert body_envelope["correlation_id"] == envelope["correlation_id"]
+    assert body_envelope["result"] == record

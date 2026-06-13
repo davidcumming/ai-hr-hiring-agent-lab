@@ -3,7 +3,7 @@
   "info": {
     "title": "AI HR Hiring Agent Lab - Copilot Studio Evaluation Tools",
     "version": "1.0.0",
-    "description": "Curated Swagger 2.0 registration artifact for Copilot Studio and Power Platform custom connector import. The source API contract remains openapi/evaluations-api.json (OpenAPI 3.1). This artifact exposes exactly two lab actions for synthetic single-candidate evaluation: submitEvaluation and getEvaluation."
+    "description": "Curated Swagger 2.0 registration artifact for Copilot Studio and Power Platform custom connector import. The source API contract remains openapi/evaluations-api.json (OpenAPI 3.1). This artifact exposes exactly three lab actions for synthetic single-candidate evaluation: submitEvaluation, getEvaluation, and retrieveEvaluationForCopilot."
   },
   "host": "function-app-host.example",
   "basePath": "/",
@@ -137,6 +137,129 @@
               "body": {
                 "position_id": "pos-sample-001",
                 "candidate_ref": "cand-sample-001"
+              }
+            },
+            "responses": {
+              "200": {
+                "body": {
+                  "status": "completed",
+                  "evaluation_id": "eval-e4-sample-0001",
+                  "case_id": null,
+                  "correlation_id": "corr-e4-sample-0001",
+                  "user_message": "Advisory evaluation completed. This output is decision support for a human reviewer; it is not a hiring decision.",
+                  "safe_details": null,
+                  "result": {
+                    "decision_support_only": true,
+                    "human_review_required": true,
+                    "ai_backend_type": "none",
+                    "provider_id": "deterministic_mock"
+                  },
+                  "errors": [],
+                  "warnings": []
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/evaluations/retrieve": {
+      "post": {
+        "tags": [
+          "CandidateEvaluation"
+        ],
+        "operationId": "retrieveEvaluationForCopilot",
+        "summary": "Retrieve one evaluation using a body-supplied id",
+        "description": "Copilot-friendly retrieve operation that accepts evaluation_id as a request body field so Copilot Studio topics can bind a stored topic variable into the tool input. The returned record is advisory decision support only and must be reviewed by a human.",
+        "security": [
+          {
+            "function_key": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Lab-Actor-Id",
+            "in": "header",
+            "required": true,
+            "type": "string",
+            "default": "copilot-e4-lab-user",
+            "description": "Temporary E4 lab simulated actor id. This is not production identity and is replaced by a later Entra-auth slice.",
+            "x-ms-summary": "Lab actor id",
+            "x-ms-visibility": "advanced"
+          },
+          {
+            "name": "X-Lab-Roles",
+            "in": "header",
+            "required": true,
+            "type": "string",
+            "default": "hr",
+            "description": "Temporary E4 lab simulated role list. Use hr for this lab smoke. This is not production authorization.",
+            "x-ms-summary": "Lab roles",
+            "x-ms-visibility": "advanced"
+          },
+          {
+            "name": "X-Lab-Actor-Display",
+            "in": "header",
+            "required": false,
+            "type": "string",
+            "default": "Copilot E4 Lab User",
+            "description": "Optional display name for the temporary E4 lab simulated actor.",
+            "x-ms-summary": "Lab actor display",
+            "x-ms-visibility": "advanced"
+          },
+          {
+            "name": "X-Correlation-Id",
+            "in": "header",
+            "required": false,
+            "type": "string",
+            "description": "Optional caller correlation id for tracing.",
+            "x-ms-summary": "Correlation id",
+            "x-ms-visibility": "advanced"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/EvaluationRetrieveRequest"
+            },
+            "description": "Evaluation id body. Use this action when a Copilot Studio topic/workflow variable must be bound into the retrieve request."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Standard response envelope. Business outcomes are returned in the envelope status and remain advisory decision support only.",
+            "schema": {
+              "$ref": "#/definitions/Envelope"
+            },
+            "examples": {
+              "application/json": {
+                "status": "completed",
+                "evaluation_id": "eval-e4-sample-0001",
+                "case_id": null,
+                "correlation_id": "corr-e4-sample-0001",
+                "user_message": "Advisory evaluation completed. This output is decision support for a human reviewer; it is not a hiring decision.",
+                "safe_details": null,
+                "result": {
+                  "decision_support_only": true,
+                  "human_review_required": true,
+                  "ai_backend_type": "none",
+                  "provider_id": "deterministic_mock"
+                },
+                "errors": [],
+                "warnings": []
+              }
+            }
+          }
+        },
+        "x-ms-examples": {
+          "Synthetic evaluation audit retrieval by body": {
+            "parameters": {
+              "X-Lab-Actor-Id": "copilot-e4-lab-user",
+              "X-Lab-Roles": "hr",
+              "X-Lab-Actor-Display": "Copilot E4 Lab User",
+              "body": {
+                "evaluation_id": "eval-e4-sample-0001"
               }
             },
             "responses": {
@@ -374,7 +497,7 @@
           "type": "object",
           "x-nullable": true,
           "additionalProperties": true,
-          "description": "Existing result payload. submitEvaluation returns the advisory result; getEvaluation returns the full persisted audit record."
+          "description": "Existing result payload. submitEvaluation returns the advisory result; getEvaluation and retrieveEvaluationForCopilot return the full persisted audit record."
         },
         "errors": {
           "type": "array",
@@ -387,6 +510,22 @@
           "items": {
             "type": "string"
           }
+        }
+      }
+    },
+    "EvaluationRetrieveRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evaluation_id"
+      ],
+      "description": "Copilot-friendly retrieve body. Use this when a stored Copilot Studio topic/workflow variable must be bound to the retrieve action input.",
+      "properties": {
+        "evaluation_id": {
+          "type": "string",
+          "description": "Evaluation id returned by submitEvaluation.",
+          "default": "eval-e4-sample-0001",
+          "x-ms-summary": "Evaluation id"
         }
       }
     }

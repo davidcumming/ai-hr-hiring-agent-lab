@@ -18,7 +18,11 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_OPENAPI_PATH = REPO_ROOT / "openapi" / "evaluations-api.json"
 OUTPUT_PATH = REPO_ROOT / "openapi" / "copilot-studio" / "evaluations-tool.swagger.json"
 
-EXPECTED_PATHS = {"/api/evaluations", "/api/evaluations/{evaluation_id}"}
+EXPECTED_PATHS = {
+    "/api/evaluations",
+    "/api/evaluations/retrieve",
+    "/api/evaluations/{evaluation_id}",
+}
 EXPECTED_ENVELOPE_FIELDS = {
     "status",
     "evaluation_id",
@@ -66,6 +70,11 @@ def _validate_source(source: dict[str, Any]) -> None:
         == "getEvaluation",
         "GET operationId drifted",
     )
+    _require(
+        paths["/api/evaluations/retrieve"]["post"].get("operationId")
+        == "retrieveEvaluationForCopilot",
+        "Copilot retrieve POST operationId drifted",
+    )
 
     request_schema = paths["/api/evaluations"]["post"]["requestBody"]["content"][
         "application/json"
@@ -78,6 +87,14 @@ def _validate_source(source: dict[str, Any]) -> None:
     _require(
         {"position_id", "candidate_ref", "idempotency_key"} <= request_fields,
         "request schema no longer exposes the expected lab fields",
+    )
+    retrieve_schema = paths["/api/evaluations/retrieve"]["post"]["requestBody"][
+        "content"
+    ]["application/json"]["schema"]
+    retrieve_fields = set(retrieve_schema.get("properties", {}))
+    _require(
+        retrieve_fields == {"evaluation_id"},
+        f"retrieve request schema drifted: {sorted(retrieve_fields)}",
     )
 
     envelope = source.get("components", {}).get("schemas", {}).get("Envelope", {})
@@ -181,8 +198,9 @@ def _build_swagger(source: dict[str, Any]) -> dict[str, Any]:
                 "Curated Swagger 2.0 registration artifact for Copilot Studio "
                 "and Power Platform custom connector import. The source API "
                 "contract remains openapi/evaluations-api.json (OpenAPI 3.1). "
-                "This artifact exposes exactly two lab actions for synthetic "
-                "single-candidate evaluation: submitEvaluation and getEvaluation."
+                "This artifact exposes exactly three lab actions for synthetic "
+                "single-candidate evaluation: submitEvaluation, getEvaluation, "
+                "and retrieveEvaluationForCopilot."
             ),
         },
         "host": "function-app-host.example",
@@ -259,6 +277,56 @@ def _build_swagger(source: dict[str, Any]) -> dict[str, Any]:
                                     "position_id": "pos-sample-001",
                                     "candidate_ref": "cand-sample-001",
                                 },
+                            },
+                            "responses": {"200": {"body": _common_response_example()}},
+                        }
+                    },
+                }
+            },
+            "/api/evaluations/retrieve": {
+                "post": {
+                    "tags": ["CandidateEvaluation"],
+                    "operationId": "retrieveEvaluationForCopilot",
+                    "summary": "Retrieve one evaluation using a body-supplied id",
+                    "description": (
+                        "Copilot-friendly retrieve operation that accepts "
+                        "evaluation_id as a request body field so Copilot Studio "
+                        "topics can bind a stored topic variable into the tool "
+                        "input. The returned record is advisory decision support "
+                        "only and must be reviewed by a human."
+                    ),
+                    "security": [{"function_key": []}],
+                    "parameters": [
+                        *lab_headers,
+                        {
+                            "name": "X-Correlation-Id",
+                            "in": "header",
+                            "required": False,
+                            "type": "string",
+                            "description": "Optional caller correlation id for tracing.",
+                            "x-ms-summary": "Correlation id",
+                            "x-ms-visibility": "advanced",
+                        },
+                        {
+                            "name": "body",
+                            "in": "body",
+                            "required": True,
+                            "schema": {"$ref": "#/definitions/EvaluationRetrieveRequest"},
+                            "description": (
+                                "Evaluation id body. Use this action when a Copilot "
+                                "Studio topic/workflow variable must be bound into "
+                                "the retrieve request."
+                            ),
+                        },
+                    ],
+                    "responses": {"200": envelope_response},
+                    "x-ms-examples": {
+                        "Synthetic evaluation audit retrieval by body": {
+                            "parameters": {
+                                "X-Lab-Actor-Id": "copilot-e4-lab-user",
+                                "X-Lab-Roles": "hr",
+                                "X-Lab-Actor-Display": "Copilot E4 Lab User",
+                                "body": {"evaluation_id": "eval-e4-sample-0001"},
                             },
                             "responses": {"200": {"body": _common_response_example()}},
                         }
@@ -401,12 +469,31 @@ def _build_swagger(source: dict[str, Any]) -> dict[str, Any]:
                         "additionalProperties": True,
                         "description": (
                             "Existing result payload. submitEvaluation returns "
-                            "the advisory result; getEvaluation returns the full "
+                            "the advisory result; getEvaluation and "
+                            "retrieveEvaluationForCopilot return the full "
                             "persisted audit record."
                         ),
                     },
                     "errors": {"type": "array", "items": {"type": "string"}},
                     "warnings": {"type": "array", "items": {"type": "string"}},
+                },
+            },
+            "EvaluationRetrieveRequest": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["evaluation_id"],
+                "description": (
+                    "Copilot-friendly retrieve body. Use this when a stored "
+                    "Copilot Studio topic/workflow variable must be bound to "
+                    "the retrieve action input."
+                ),
+                "properties": {
+                    "evaluation_id": {
+                        "type": "string",
+                        "description": "Evaluation id returned by submitEvaluation.",
+                        "default": "eval-e4-sample-0001",
+                        "x-ms-summary": "Evaluation id",
+                    }
                 },
             },
         },

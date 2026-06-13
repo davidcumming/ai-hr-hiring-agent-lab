@@ -40,6 +40,10 @@ def test_rp010_stable_operation_ids_present():
     spec = _spec()
     assert spec["paths"]["/api/evaluations"]["post"]["operationId"] == "submitEvaluation"
     assert (
+        spec["paths"]["/api/evaluations/retrieve"]["post"]["operationId"]
+        == "retrieveEvaluationForCopilot"
+    )
+    assert (
         spec["paths"]["/api/evaluations/{evaluation_id}"]["get"]["operationId"]
         == "getEvaluation"
     )
@@ -58,6 +62,13 @@ def test_rp010_headers_documented():
         )
     }
     assert "X-Correlation-Id" in get_params
+    retrieve_params = {
+        p["name"]
+        for p in spec["paths"]["/api/evaluations/retrieve"]["post"].get(
+            "parameters", []
+        )
+    }
+    assert "X-Correlation-Id" in retrieve_params
 
 
 def test_rp010_request_schema_exposes_no_backend_selection():
@@ -67,6 +78,10 @@ def test_rp010_request_schema_exposes_no_backend_selection():
     ]["schema"]
     fields = set(schema.get("properties", {}).keys())
     assert not fields & FORBIDDEN_REQUEST_FIELDS
+    retrieve_schema = spec["paths"]["/api/evaluations/retrieve"]["post"][
+        "requestBody"
+    ]["content"]["application/json"]["schema"]
+    assert set(retrieve_schema.get("properties", {}).keys()) == {"evaluation_id"}
 
 
 def test_rp011_header_only_idempotency_key(make_client):
@@ -122,3 +137,12 @@ def test_rp010_correlation_header_on_responses(make_client):
     evaluation_id = submit.json()["evaluation_id"]
     retrieve = client.get(f"/api/evaluations/{evaluation_id}", headers=HR_HEADERS)
     assert retrieve.headers.get("X-Correlation-Id") == submit.json()["correlation_id"]
+    body_retrieve = client.post(
+        "/api/evaluations/retrieve",
+        json={"evaluation_id": evaluation_id},
+        headers=HR_HEADERS,
+    )
+    assert (
+        body_retrieve.headers.get("X-Correlation-Id")
+        == submit.json()["correlation_id"]
+    )

@@ -108,6 +108,44 @@ def test_get_unknown_evaluation_id_validation_failed(client):
     assert "unknown_evaluation_id" in envelope["errors"]
 
 
+def test_body_retrieve_unknown_evaluation_id_validation_failed(client):
+    response = client.post(
+        "/api/evaluations/retrieve",
+        json={"evaluation_id": "eval-does-not-exist"},
+        headers=HR_HEADERS,
+    )
+    assert response.status_code == 200
+    envelope = response.json()
+    assert envelope["status"] == "validation_failed"
+    assert "unknown_evaluation_id" in envelope["errors"]
+
+
+def test_body_retrieve_malformed_non_json_body_http_400(client):
+    response = client.post(
+        "/api/evaluations/retrieve",
+        content=b"this is not json {",
+        headers={**HR_HEADERS, "Content-Type": "application/json"},
+    )
+    assert response.status_code == 400
+    assert response.json()["error"] == "malformed_request_body"
+
+
+def test_body_retrieve_missing_evaluation_id_http_400(client):
+    response = client.post("/api/evaluations/retrieve", json={}, headers=HR_HEADERS)
+    assert response.status_code == 400
+    assert response.json()["error"] == "malformed_request_body"
+
+
+def test_body_retrieve_extra_field_http_400(client):
+    response = client.post(
+        "/api/evaluations/retrieve",
+        json={"evaluation_id": "eval-x", "unexpected_field": True},
+        headers=HR_HEADERS,
+    )
+    assert response.status_code == 400
+    assert response.json()["error"] == "malformed_request_body"
+
+
 def test_no_reserved_status_emitted(client):
     """needs_input / error are reserved — every emitted status here is in the
     four-value emitted vocabulary."""
