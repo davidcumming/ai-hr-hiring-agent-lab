@@ -161,6 +161,38 @@ Idempotency logic (`persistence/idempotency.py`) remains a thin layer over
 `StorageBackend` ABC, to avoid a second source of truth (a future Azure
 implementation would map the idempotency table to Azure Table directly).
 
+### Workflow storage foundation (`src/hr_eval_lab/persistence/workflow_store.py`)
+
+E7 adds internal workflow storage contracts beside the existing evaluation
+persistence seam. These are Azure-shaped but local-only:
+
+- `domain/schemas/workflow.py` defines 18 Table-shaped MVP workflow entities
+  (`RecruitmentCases`, `CaseParticipants`, `CaseTasks`, `CaseEvents`,
+  `WorkflowGates`, `Notifications`, `SourceDocuments`, `ArtifactVersions`,
+  `Approvals`, `Applicants`, `CandidatePackages`, `ModelAssessmentJobs`,
+  `ModelCandidateAssessments`, `ModelCriterionRatings`,
+  `HumanCandidateReviews`, `HumanCriterionReviewItems`,
+  `FinalCandidateEvaluations`, and `FinalCriterionRatings`). All use
+  `PartitionKey`, `RowKey`, `entity_type`, and `schema_version = "1.0"`.
+  Case-partitioned entities enforce `PartitionKey == case_id`; Notification
+  supports recipient actor inbox partitions and `case#{case_id}` partitions.
+  Critical workflow RowKeys enforce their expected prefixes.
+- `domain/schemas/workflow_artifacts.py` defines the canonical Blob paths for
+  case documents, case artifacts, model assessment records, human reviews, and
+  final evaluation reports. Path builders reject traversal, leading slashes,
+  query strings, non-normalized paths, and unknown container prefixes.
+- `domain/schemas/workflow_queue.py` defines Queue message contracts for
+  `run-model-candidate-assessment`, `run-model-assessment-batch`, and
+  `write-notification`; messages reject raw-content and secret markers even
+  when injected into otherwise allowed string/list fields.
+- `LocalWorkflowStore` persists these shapes under `<root>/workflow/` using
+  JSONL Table rows, local files for Blob artifacts, and JSONL Queue messages.
+  It imports no Azure SDKs and performs no network I/O.
+
+This is **not** a new public API and it is **not** an Azure Table/Queue SDK
+adapter. Future slices can wire these contracts into facade routes, workers,
+or live Azure adapters after architecture review.
+
 ### Azure storage status after E3
 
 - Implemented: `AzureBlobBackend` methods persist the full record and artifact
@@ -211,11 +243,11 @@ role-to-future-agent mapping sample (placeholders only) is committed at
 ## 4. Seams that do NOT exist
 
 To prevent over-reading: there is no identity seam (auth is a single
-header-parsing function in `api/auth.py`), no queue/messaging seam (the
-review queue is a JSONL file), no eval-harness seam (live-eval stubs skip
-unconditionally), and no configuration service seam (one TOML file read at
-startup, plus server-side environment guards and the Azure Functions
-wrapper-only storage overlay).
+header-parsing function in `api/auth.py`), no live Azure Queue/worker seam
+(E7 defines Queue message contracts and a local JSONL adapter only), no
+eval-harness seam (live-eval stubs skip unconditionally), and no configuration
+service seam (one TOML file read at startup, plus server-side environment
+guards and the Azure Functions wrapper-only storage overlay).
 
 ## 5. Live-wiring gates (status, not architecture)
 

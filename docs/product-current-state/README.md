@@ -26,6 +26,12 @@ The API exposes `submitEvaluation`, the canonical explicit-ID
 `getEvaluation`, and the body-based `retrieveEvaluationForCopilot` wrapper
 for Copilot Studio topic-variable binding.
 
+The repo also contains the E7 workflow storage foundation for the future MVP
+case workflow: strict internal Table-shaped entity schemas, canonical Blob
+path builders, Queue message contracts, and a deterministic local workflow
+store. These contracts are not yet public API endpoints, workers, Copilot
+topics, or live Azure Table/Queue adapters.
+
 Foundry-facing surfaces exist only as **fail-closed, non-functional
 scaffolds**: the three Foundry provider scaffolds raise safe configuration
 errors on any use (selection is additionally blocked by
@@ -52,7 +58,7 @@ Copilot ALM export, durable screenshot/export/transcript, production identity,
 or live Foundry execution exists.
 
 A deterministic test suite (`tests/`, DT-001…DT-018 plus RP and smoke
-coverage) covers the behavior described here: 200 tests pass, 7 live-eval
+coverage) covers the behavior described here: 259 tests pass, 7 live-eval
 stubs skip with a documented deferral rationale, 0 fail (verified run,
 2026-06-13).
 
@@ -60,7 +66,7 @@ stubs skip with a documented deferral rationale, 0 fail (verified run,
 
 | Document | Contents |
 |---|---|
-| [`candidate-evaluation-council.md`](./candidate-evaluation-council.md) | The full behavior reference: API endpoints (operation IDs, idempotency/correlation headers), envelope and error model, simulated auth, council orchestration and modes, rigor and escalation, quality gates, evidence packet, persistence (artifact tree, summary rows, storage-backend seam) and audit record, idempotency, review queue, CLI and local scripts, configuration surface and environment guards, prompt registry, fixtures, logging guarantees, and limitations. |
+| [`candidate-evaluation-council.md`](./candidate-evaluation-council.md) | The full behavior reference: API endpoints (operation IDs, idempotency/correlation headers), envelope and error model, simulated auth, council orchestration and modes, rigor and escalation, quality gates, evidence packet, persistence (artifact tree, summary rows, storage-backend seam, E7 workflow storage foundation) and audit record, idempotency, review queue, CLI and local scripts, configuration surface and environment guards, prompt registry, fixtures, logging guarantees, and limitations. |
 
 ## How these docs relate to other documentation
 

@@ -4,7 +4,7 @@ Present-tense reference for what the system does today. Sources: the modules
 under `src/hr_eval_lab/`, `config/lab-config.toml`, `fixtures/`,
 `openapi/evaluations-api.json`, and the deterministic test suite under
 `tests/` (DT-001…DT-018 plus the RP storage/provider/prompt/contract suite;
-200 passed / 7 deferred-live-eval skips / 0 failed, verified 2026-06-13).
+259 passed / 7 deferred-live-eval skips / 0 failed, verified 2026-06-13).
 Claims that rest on code inspection alone (no dedicated test) are flagged
 inline.
 
@@ -33,6 +33,11 @@ Everything runs locally and deterministically:
   errors on any use (see §13, §15 and
   `../architecture/provider-and-storage-seams.md`). Live Foundry wiring is
   deferred and human-gated.
+- E7 defines internal workflow storage contracts for the future MVP case
+  workflow: 18 Azure Table-shaped entities, canonical Blob path builders,
+  three Queue message contracts, and a deterministic local workflow store.
+  These contracts are not yet public API endpoints, workers, Copilot topics,
+  or live Azure Table/Queue adapters.
 
 ## 2. HTTP API
 
@@ -358,6 +363,13 @@ evaluation audit record. Idempotency rows, evidence JSONL rows, review queue
 rows, and Azure Table Storage system-of-record behavior remain local/deferred
 unless a later slice implements Table-backed persistence.
 
+E7 workflow-storage boundary: `domain/schemas/workflow.py`,
+`workflow_artifacts.py`, and `workflow_queue.py` define the Table, Blob, and
+Queue contracts for future case/workflow slices. `LocalWorkflowStore` can
+persist those shapes locally under `<root>/workflow/` as JSONL rows, files,
+and queue-message JSONL. It is not selected by `create_app()` and imports no
+Azure SDK modules.
+
 ## 12. Review queue
 
 Every evaluation gets a `ReviewQueue.jsonl` entry (`review_queue.py`) —
@@ -503,14 +515,16 @@ script's stdout is test-verified to contain no resume or prompt text.
 
 ## 20. Tests and CI
 
-- `tests/` — deterministic suite DT-001…DT-018 plus `test_smoke.py`, and the
+- `tests/` — deterministic suite DT-001…DT-018 plus `test_smoke.py`, the
   readiness suite `test_rp001_storage_backend.py` …
   `test_rp005_cli_and_smoke.py` (storage backend + artifact layout + summary
   rows + transcripts; scaffolds/provider registry/guards; prompt registry;
-  OpenAPI + header behavior; CLI demo + smoke scripts).
+  OpenAPI + header behavior; CLI demo + smoke scripts), and the E7 workflow
+  foundation tests (`test_e7_*`: workflow schemas, Blob paths, Queue
+  messages, local workflow store, and non-goals).
   `tests/live_evals/test_le_stubs.py` holds LE-001…LE-007 stubs that **skip**
   with a documented rationale (no live model behavior exists to evaluate).
-  Verified result (2026-06-13): 200 passed, 7 skipped, 0 failed.
+  Verified result (2026-06-13): 259 passed, 7 skipped, 0 failed.
 - `.github/workflows/ci.yml` — on PR and push to main: Python 3.10,
   `pip install -e ".[dev]"`, `pytest -q`, and the OpenAPI drift check. No
   cloud credentials, no deployment.
