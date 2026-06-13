@@ -36,26 +36,40 @@ The existing route remains unchanged:
   Swagger artifact.
 - Kept `getEvaluation` in the Copilot Swagger so existing explicit-ID/manual
   retrieve usage remains available.
+- Updated the Power Apps custom connector from
+  `openapi/copilot-studio/evaluations-tool.swagger.json` so it exposes
+  `submitEvaluation`, `getEvaluation`, and `retrieveEvaluationForCopilot`.
 
-No Azure resources, Power Platform settings, Copilot Studio topics, secrets,
-real applicant data, live Foundry wiring, production identity, or current-state
-docs were changed in this implementation pass.
+No secrets, real applicant data, live Foundry wiring, production identity, or
+current-state docs were changed in this documentation/evidence pass.
 
-## 3. Copilot Studio Follow-Up
+## 3. Manual Copilot Studio Result
 
-After this API/Swagger change is deployed or otherwise made available to the
-custom connector, Copilot Studio needs a connector/API-definition update or
-re-import. Expected manual steps:
+The manual Copilot Studio implementation completed after the connector update
+and a tool-routing correction:
 
-1. Refresh or recreate the connector/connection if metadata is stale.
-2. Add or select `retrieveEvaluationForCopilot`.
-3. Bind the action body field `evaluation_id` to the stored topic variable,
-   for example `Topic.submitted_evaluation_id`.
-4. Do not use `Dynamically fill with AI` for this identifier.
-5. Run the submit -> store `evaluation_id` -> retrieve smoke.
-6. Capture redacted manual evidence without Function keys, connection secrets,
-   tenant IDs, subscription IDs, real applicant data, or secret-bearing
-   screenshots.
+- The new backend endpoint `POST /api/evaluations/retrieve` was deployed and
+  directly tested.
+- The custom connector test for `retrieveEvaluationForCopilot` succeeded with
+  HTTP 200, `status="completed"`, and an `evaluation_id` match.
+- The topic `E6 Evaluate Sample Candidate` calls `submitEvaluation`, stores the
+  returned `evaluation_id` in `submitted_evaluation_id`, and reuses that stored
+  value for `retrieveEvaluationForCopilot`.
+- The final Copilot Studio test prompt `Evaluate the sample candidate.`
+  completed the topic and displayed `eval-a427db3ad61c4e8eac20`.
+- The final response preserved advisory-only and human-review-required language
+  and used only synthetic sample-candidate data.
+
+The remaining issue was Copilot Studio tool routing precedence, not the
+body-based retrieve wrapper. The standalone `submitEvaluation` tool initially
+pre-empted the topic until `submitEvaluation` and
+`retrieveEvaluationForCopilot` were set to `Only when referenced by topics or
+agents`.
+
+Manual evidence is captured in
+`docs/delivery/slices/slice-e6-copilot-evaluation-id-state/manual-config-evidence.md`.
+No Function key, connection secret, tenant ID, subscription ID, real applicant
+data, or secret-bearing screenshot is recorded there.
 
 ## 4. Validation Targets
 
@@ -70,7 +84,7 @@ Implementation validation should include:
 
 ## 5. E6 Recommendation
 
-E6 should continue with `retrieveEvaluationForCopilot`. The slice should be
-declared blocked only if Copilot Studio also cannot bind the stored topic
-variable into this body field after the custom connector/API definition is
-updated.
+E6 should continue to use `retrieveEvaluationForCopilot` for topic-driven
+retrieve workflows. Future Copilot Studio topic-driven connector actions should
+use topic/agent referenced availability instead of broad direct agent use when
+standalone tools would otherwise pre-empt the intended topic.
