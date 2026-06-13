@@ -70,3 +70,19 @@ These skills replace four pre-redesign skills that were merged, and one that was
 | `slice-retro-and-lessons` | `process-retro-facilitator` + `process-lessons-curator` + `implementation-lessons-curator` |
 
 Pre-redesign Markdown and zip packages under `Skills/_superseded/` are historical only. Do not use them for active work.
+
+## Ignored Local/System Files
+
+Coding agents must ignore local operating-system, editor, cache, and generated metadata files unless the user explicitly asks otherwise.
+
+Never read, modify, stage, commit, summarize, or treat the following as meaningful project changes:
+
+- `.DS_Store`
+- `Thumbs.db`
+- `.Spotlight-V100/`
+- `.Trashes/`
+- editor swap/temp files
+- local cache directories
+- files already ignored by `.gitignore`
+
+When reviewing changes, base conclusions on Git-tracked project files and intentional untracked project files only. Do not include ignored local/system files in change summaries, validation reports, diffs, or commits.
