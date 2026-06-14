@@ -9,10 +9,12 @@ and constructs the UNSCRIPTED deterministic mock provider.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from pydantic.json_schema import models_json_schema
 
 from hr_eval_lab import __version__
 from hr_eval_lab.api.errors import (
@@ -21,8 +23,13 @@ from hr_eval_lab.api.errors import (
     api_error_handler,
     malformed_body_handler,
 )
-from hr_eval_lab.api.routes_evaluations import router
+from hr_eval_lab.api.routes_cases import router as cases_router
+from hr_eval_lab.api.routes_evaluations import router as evaluations_router
 from hr_eval_lab.config import LabConfig, load_config
+from hr_eval_lab.domain.schemas.cases import (
+    HiringManagerInput,
+    RecruitmentCaseCreateRequest,
+)
 from hr_eval_lab.logging_setup import get_logger
 from hr_eval_lab.persistence.backend import select_backend
 from hr_eval_lab.persistence.store import LocalStore
@@ -30,22 +37,48 @@ from hr_eval_lab.persistence.workflow_storage import select_workflow_storage
 from hr_eval_lab.providers.base import CouncilProvider, select_provider
 from hr_eval_lab.sources.fixture_store import FixtureStore
 
-OPENAPI_TITLE = "AI HR Hiring Agent Lab — Candidate Evaluation Council API"
+OPENAPI_TITLE = "AI HR Hiring Agent Lab API"
 OPENAPI_VERSION = "1.0.0"
 OPENAPI_DESCRIPTION = (
-    "Advisory, evidence-grounded single-candidate evaluation "
-    "(slice-e1-candidate-evaluation-council). Every result is decision support "
-    "for a human reviewer (decision_support_only=true, "
+    "Advisory, evidence-grounded single-candidate evaluation plus the E9 "
+    "recruitment-case state foundation. Evaluation results are decision "
+    "support for a human reviewer (decision_support_only=true, "
     "human_review_required=true) — never a hiring decision, ranking, or "
-    "candidate contact. Authentication uses SIMULATED lab identity headers "
-    "(X-Lab-Actor-Id, X-Lab-Roles; the 'hr' role is required for both "
-    "endpoints); this is a lab stand-in, never an Entra substitute. Envelope "
-    "status vocabulary: completed | blocked | validation_failed | unauthorized "
-    "are emitted; needs_input and error are RESERVED (declared, never emitted "
-    "by this slice). HTTP mapping per the adopted API contracts: business "
-    "outcomes return 200 with the envelope status; 400 malformed body; 401 "
-    "missing identity; 403 authenticated without the required role."
+    "candidate contact. Case endpoints create and retrieve deterministic "
+    "workflow state only; they do not import applicants, upload documents, "
+    "start assessment jobs, send notifications, call Foundry/model backends, "
+    "or change Copilot Studio. Authentication uses SIMULATED lab identity "
+    "headers (X-Lab-Actor-Id, X-Lab-Roles; the 'hr' role is required); this "
+    "is a lab stand-in, never an Entra substitute. Envelope status vocabulary: "
+    "completed | blocked | validation_failed | unauthorized are emitted; "
+    "needs_input and error are RESERVED. HTTP mapping per the adopted API "
+    "contracts: business outcomes return 200 with the envelope status; 400 "
+    "malformed body; 401 missing identity; 403 authenticated without the "
+    "required role."
 )
+
+
+def _case_request_component_schemas() -> dict[str, Any]:
+    _, definitions = models_json_schema(
+        [
+            (RecruitmentCaseCreateRequest, "validation"),
+            (HiringManagerInput, "validation"),
+        ],
+        ref_template="#/components/schemas/{model}",
+    )
+    return definitions["$defs"]
+
+
+def _install_case_openapi_components(app: FastAPI) -> None:
+    original_openapi = app.openapi
+
+    def _openapi() -> dict[str, Any]:
+        schema = original_openapi()
+        schemas = schema.setdefault("components", {}).setdefault("schemas", {})
+        schemas.update(_case_request_component_schemas())
+        return schema
+
+    app.openapi = _openapi
 
 
 def create_app(
@@ -98,7 +131,9 @@ def create_app(
             response.headers["X-Correlation-Id"] = correlation_id
         return response
 
-    app.include_router(router)
+    app.include_router(evaluations_router)
+    app.include_router(cases_router)
+    _install_case_openapi_components(app)
 
     logger = get_logger("app")
     logger.info(

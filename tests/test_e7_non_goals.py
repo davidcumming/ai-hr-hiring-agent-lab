@@ -1,4 +1,4 @@
-"""E7 non-goal pins: no public API, no cloud SDK path, no live model work."""
+"""E7 non-goal pins updated after E9's narrow case API foundation."""
 
 from __future__ import annotations
 
@@ -10,14 +10,21 @@ import sys
 from tests.conftest import REPO_ROOT
 
 
-def test_e7_default_app_still_has_no_case_or_notification_api(make_client):
+E9_CASE_PATHS = {
+    "/api/cases",
+    "/api/cases/{case_id}",
+    "/api/cases/{case_id}/next-actions",
+}
+
+
+def test_e7_public_surface_non_goals_after_e9_case_foundation(make_client):
     client = make_client()
     paths = set(client.app.openapi()["paths"])
 
     assert "/api/evaluations" in paths
     assert "/api/evaluations/retrieve" in paths
     assert "/api/evaluations/{evaluation_id}" in paths
-    assert not any(path.startswith("/api/cases") for path in paths)
+    assert {path for path in paths if path.startswith("/api/cases")} == E9_CASE_PATHS
     assert not any("notifications" in path for path in paths)
 
 

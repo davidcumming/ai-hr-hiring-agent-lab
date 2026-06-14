@@ -163,9 +163,11 @@ implementation would map the idempotency table to Azure Table directly).
 
 ### Workflow storage foundation (`src/hr_eval_lab/persistence/workflow_storage.py`)
 
-E7 adds internal workflow storage contracts beside the existing evaluation
-persistence seam. E8 adds guarded Azure SDK-backed adapters behind those
-contracts while preserving the local deterministic default:
+E7 adds workflow storage contracts beside the existing evaluation persistence
+seam. E8 adds guarded Azure SDK-backed adapters behind those contracts while
+preserving the local deterministic default. E9 uses the Table portion of this
+seam for the first public recruitment-case endpoints: `POST /api/cases`,
+`GET /api/cases/{case_id}`, and `GET /api/cases/{case_id}/next-actions`.
 
 - `domain/schemas/workflow.py` defines 18 Table-shaped MVP workflow entities
   (`RecruitmentCases`, `CaseParticipants`, `CaseTasks`, `CaseEvents`,
@@ -190,6 +192,11 @@ contracts while preserving the local deterministic default:
   `WorkflowTableStore`, `WorkflowBlobStore`, `WorkflowQueueStore`, and the
   composed `WorkflowStorageBackend`. `select_workflow_storage()` resolves the
   backend lazily from `[workflow_storage]`.
+- `cases/service.py` depends only on `WorkflowStorageBackend`. It creates and
+  reads `RecruitmentCases`, `CaseParticipants`, `CaseTasks`, `WorkflowGates`,
+  and `CaseEvents` rows for E9. It does not import concrete local/Azure
+  adapters, Azure SDKs, provider code, Blob path writers, Queue writers, or
+  Copilot tooling.
 - `LocalWorkflowStore` persists these shapes under `<root>/workflow/` using
   JSONL Table rows, local files for Blob artifacts, and JSONL Queue messages.
   It imports no Azure SDKs, performs no network I/O, and remains the default.
@@ -201,9 +208,11 @@ contracts while preserving the local deterministic default:
   Azure SDKs only inside the real-client builder after configuration guards
   pass; deterministic tests inject fake clients.
 
-This is **not** a new public API, worker, resource-creation path, or Copilot
-surface. Future slices can wire these contracts into facade routes and workers
-without rewriting the storage boundary.
+E9 is a narrow public API use of the Table contracts only. It is **not** a
+worker, resource-creation path, Copilot surface, notification API, document
+API, applicant import path, model-assessment launcher, or live Azure smoke.
+Future slices can wire more contracts into facade routes and workers without
+rewriting the storage boundary.
 
 ### Azure storage status after E3
 
@@ -258,11 +267,13 @@ role-to-future-agent mapping sample (placeholders only) is committed at
 ## 4. Seams that do NOT exist
 
 To prevent over-reading: there is no identity seam (auth is a single
-header-parsing function in `api/auth.py`), no live Azure Queue/worker seam
-(E7 defines Queue message contracts and a local JSONL adapter only), no
-eval-harness seam (live-eval stubs skip unconditionally), and no configuration
-service seam (one TOML file read at startup, plus server-side environment
-guards and the Azure Functions wrapper-only storage overlay).
+header-parsing function in `api/auth.py`), no case-scoped authorization seam
+(E9 case endpoints still require the global simulated `hr` lab role), no live
+Azure Queue/worker seam (E7 defines Queue message contracts and local/Azure
+adapters only; E9 does not enqueue), no eval-harness seam (live-eval stubs
+skip unconditionally), and no configuration service seam (one TOML file read
+at startup, plus server-side environment guards and the Azure Functions
+wrapper-only storage overlay).
 
 ## 5. Live-wiring gates (status, not architecture)
 

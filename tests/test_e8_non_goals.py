@@ -1,4 +1,4 @@
-"""E8 non-goal pins: guarded workflow storage only, no public surface."""
+"""E8 non-goal pins updated after E9's narrow case API foundation."""
 
 from __future__ import annotations
 
@@ -23,8 +23,14 @@ WORKFLOW_ENV_NAMES = (
     "HRHA_MANAGED_IDENTITY_CLIENT_ID",
 )
 
+E9_CASE_PATHS = {
+    "/api/cases",
+    "/api/cases/{case_id}",
+    "/api/cases/{case_id}/next-actions",
+}
 
-def test_e8_default_app_selects_local_workflow_storage_without_public_routes(
+
+def test_e8_default_app_selects_local_workflow_storage_with_only_e9_case_routes(
     make_client,
 ):
     client = make_client()
@@ -32,7 +38,7 @@ def test_e8_default_app_selects_local_workflow_storage_without_public_routes(
 
     assert type(client.app.state.workflow_storage).__name__ == "LocalWorkflowStore"
     assert client.app.state.config.workflow_storage.backend == "local"
-    assert not any(path.startswith("/api/cases") for path in paths)
+    assert {path for path in paths if path.startswith("/api/cases")} == E9_CASE_PATHS
     assert not any("notifications" in path for path in paths)
     assert not any("workflow" in path for path in paths)
 

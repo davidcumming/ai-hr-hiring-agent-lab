@@ -18,7 +18,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_OPENAPI_PATH = REPO_ROOT / "openapi" / "evaluations-api.json"
 OUTPUT_PATH = REPO_ROOT / "openapi" / "copilot-studio" / "evaluations-tool.swagger.json"
 
-EXPECTED_PATHS = {
+EXPECTED_EVALUATION_PATHS = {
     "/api/evaluations",
     "/api/evaluations/retrieve",
     "/api/evaluations/{evaluation_id}",
@@ -60,7 +60,11 @@ def _require(condition: bool, message: str) -> None:
 def _validate_source(source: dict[str, Any]) -> None:
     _require(source.get("openapi") == "3.1.0", "source contract must remain OpenAPI 3.1.0")
     paths = source.get("paths", {})
-    _require(set(paths) == EXPECTED_PATHS, f"source paths drifted: {sorted(paths)}")
+    missing_paths = EXPECTED_EVALUATION_PATHS - set(paths)
+    _require(
+        not missing_paths,
+        f"source evaluation paths missing: {sorted(missing_paths)}",
+    )
     _require(
         paths["/api/evaluations"]["post"].get("operationId") == "submitEvaluation",
         "POST operationId drifted",

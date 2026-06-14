@@ -27,12 +27,15 @@ connector contract, stores the returned `evaluation_id` in
 actual manual portal configuration evidence, not source-controlled Copilot
 ALM or production integration.
 
-The repository also defines the E7/E8 workflow storage foundation as internal
-contracts and adapters: Azure Table-shaped workflow entities, canonical Blob
-path builders, Azure Queue-shaped message contracts, a deterministic
-`LocalWorkflowStore`, and a guarded `AzureWorkflowStorageBackend` selected only
-by explicit workflow-storage configuration. These contracts are not yet wired
-into public API endpoints, workers, or Copilot topics.
+The repository also defines the E7/E8 workflow storage foundation: Azure
+Table-shaped workflow entities, canonical Blob path builders, Azure
+Queue-shaped message contracts, a deterministic `LocalWorkflowStore`, and a
+guarded `AzureWorkflowStorageBackend` selected only by explicit
+workflow-storage configuration. E9 wires the Table side of that seam into the
+first public recruitment-case API endpoints for creating a case, retrieving a
+case, and retrieving deterministic next actions. Workflow Blob artifacts,
+Queue messages, workers, notifications, documents, applicant import, Copilot
+topics, and live Azure resource creation are still not wired by the case API.
 
 ```
 CLI (httpx)        any HTTP client
@@ -41,7 +44,7 @@ CLI (httpx)        any HTTP client
   Azure Functions ASGI wrapper (function_app.py) [deployment bridge only]
                  |
                  v
-  FastAPI facade (api/app.py, api/routes_evaluations.py)
+  FastAPI facade (api/app.py, api/routes_evaluations.py, api/routes_cases.py)
    ├─ auth (api/auth.py — simulated header identity)
    ├─ envelope/errors (api/envelope.py, api/errors.py)
    ├─ X-Correlation-Id response middleware (api/app.py)
@@ -72,7 +75,9 @@ CLI (httpx)        any HTTP client
             │                           [Function wrapper smoke path]
             └─ AzureBlobBackend (persistence/azure_blob_backend.py)
                  [explicit hosted record/artifact backend; guarded]
-   workflow storage foundation (E7/E8, internal only)
+   case service (cases/service.py)
+       [deterministic workflow-state facade over WorkflowStorageBackend]
+   workflow storage foundation (E7/E8; E9 uses Table entities)
        ├─ workflow Table schemas (domain/schemas/workflow.py)
        ├─ workflow Blob path contracts (domain/schemas/workflow_artifacts.py)
        ├─ workflow Queue message contracts (domain/schemas/workflow_queue.py)
@@ -83,7 +88,7 @@ CLI (httpx)        any HTTP client
             [explicit guarded Table/Blob/Queue adapter; lazy Azure SDK imports]
    review queue row builder (review_queue.py)
    logging + never-log redaction (logging_setup.py)
-   domain schemas (domain/schemas/: request, council, evaluation,
+   domain schemas (domain/schemas/: request, cases, council, evaluation,
                    provider, audit, storage, transcript, workflow,
                    workflow_artifacts, workflow_queue; domain/ids.py)
 
@@ -98,11 +103,12 @@ Copilot Studio manual lab topic
 |---|---|
 | Root `function_app.py` | Azure Functions Python ASGI wrapper around the existing FastAPI app factory. It loads normal config, overrides `persistence.root` to `HRHA_PERSISTENCE_ROOT` or a temp directory, overlays Azure Blob storage app settings only when `HRHA_STORAGE_BACKEND=azure_blob`, and overlays guarded workflow storage only when `HRHA_WORKFLOW_STORAGE_BACKEND=azure`; no routes, business logic, or Foundry behavior are added here. |
 | Root `host.json` / `.funcignore` / `requirements.txt` | Function host route-prefix config, deployment ignore hygiene, and Azure Functions deployment dependencies. |
-| `api/` | App factory, routes (`POST /api/evaluations` / `submitEvaluation`, `GET /api/evaluations/{evaluation_id}` / `getEvaluation`, `POST /api/evaluations/retrieve` / `retrieveEvaluationForCopilot`), simulated auth, envelope, HTTP/error mapping, `Idempotency-Key` header handling, `X-Correlation-Id` request/response header. |
+| `api/` | App factory, evaluation routes (`POST /api/evaluations` / `submitEvaluation`, `GET /api/evaluations/{evaluation_id}` / `getEvaluation`, `POST /api/evaluations/retrieve` / `retrieveEvaluationForCopilot`), E9 case routes (`POST /api/cases` / `createRecruitmentCase`, `GET /api/cases/{case_id}` / `getRecruitmentCase`, `GET /api/cases/{case_id}/next-actions` / `getCaseNextActions`), simulated auth, envelopes, HTTP/error mapping, `Idempotency-Key` header handling for evaluation submit, `X-Correlation-Id` request/response header. |
+| `cases/` | Deterministic recruitment-case service layer. It depends only on `WorkflowStorageBackend`, creates the E9 `RecruitmentCases`, `CaseParticipants`, `CaseTasks`, `WorkflowGates`, and `CaseEvents` rows, and builds read-only case/next-action snapshots. It does not import `LocalWorkflowStore`, `AzureWorkflowStorageBackend`, Azure SDKs, providers, queues, Blob artifacts, or Copilot tooling. |
 | `cli.py` | Thin HTTP client (stdlib + httpx only — no application imports). |
 | `config.py` | Typed, validated view of `config/lab-config.toml` (pydantic, `extra="forbid"`); provider-ID/backend-family consistency validation; evaluation and workflow storage backend selection; Foundry/provider env guard readers (`HRHA_ENABLE_LIVE_AZURE`, `HRHA_PROVIDER_KILL_SWITCH`) plus storage-specific guards (`HRHA_ENABLE_AZURE_STORAGE`, `HRHA_ENABLE_AZURE_WORKFLOW_STORAGE`); `tomllib` with `tomli` fallback on Python 3.10. |
 | `council/` | 11-role registry and Mode A/B/C tables, synchronous orchestrator, deterministic code roles. |
-| `domain/` | Run-identity generation (`ids.py`) and all pydantic schema sources: request, per-role council outputs, advisory result, provider contract, audit record + table-row shapes, storage boundary (`storage.py`: `StorageArtifactRef`, `RecordSummaryRow`), per-role transcript (`transcript.py`: `CouncilRoleInvocation`), and E7 workflow contracts (`workflow.py`, `workflow_artifacts.py`, `workflow_queue.py`). |
+| `domain/` | Run-identity generation (`ids.py`) and all pydantic schema sources: evaluation request, case request/response envelope, per-role council outputs, advisory result, provider contract, audit record + table-row shapes, storage boundary (`storage.py`: `StorageArtifactRef`, `RecordSummaryRow`), per-role transcript (`transcript.py`: `CouncilRoleInvocation`), and workflow contracts (`workflow.py`, `workflow_artifacts.py`, `workflow_queue.py`). |
 | `escalation/` | Escalation decision with recorded provenance (`none \| configured_escalated \| policy_triggered`). |
 | `evidence/` | Evidence packet builder (stable segment addressing, rubric view, canonical serialization). |
 | `gates/` | The six deterministic quality gates. |
@@ -116,10 +122,14 @@ Copilot Studio manual lab topic
 
 ## 3. Layering and data flow
 
-1. **Facade layer** (`api/`) — the only entry point. Enforces order: auth →
-   body validation (including idempotency-key presence/consistency across
-   body field and `Idempotency-Key` header) → semantic validation →
-   idempotency → source integrity → orchestration → persistence → envelope.
+1. **Facade layer** (`api/`) — the only entry point. Evaluation submit
+   enforces order: auth → body validation (including idempotency-key
+   presence/consistency across body field and `Idempotency-Key` header) →
+   semantic validation → idempotency → source integrity → orchestration →
+   persistence → envelope. Case create enforces auth → body validation →
+   deterministic case service → envelope. Case read and next-action endpoints
+   enforce auth before storage reads and return `validation_failed` for an
+   unknown case id.
    A response middleware sets `X-Correlation-Id` from the envelope's
    server-assigned correlation id (or echoes a caller-supplied header when no
    envelope id exists). The CLI is strictly a client of this layer (verified
@@ -140,23 +150,28 @@ Copilot Studio manual lab topic
    table-equivalents; the full record and its artifact projections are the
    only text-bearing artifacts; table and summary rows are metadata-first by
    schema construction.
-5. **Workflow storage foundation** (`domain/schemas/workflow*.py`,
-   `persistence/workflow_storage.py`, `persistence/workflow_store.py`,
-   `persistence/azure_workflow_storage.py`) — internal E7/E8 contracts define
-   the MVP case/workflow entity model, exact Blob paths, and async work request
-   messages. The local adapter remains deterministic; the Azure adapter maps
-   the same contracts to guarded Table/Blob/Queue SDK clients. No facade route
-   or worker uses them yet.
+5. **Workflow storage foundation and case service**
+   (`domain/schemas/workflow*.py`, `domain/schemas/cases.py`,
+   `cases/service.py`, `persistence/workflow_storage.py`,
+   `persistence/workflow_store.py`, `persistence/azure_workflow_storage.py`) —
+   E7/E8 contracts define the MVP case/workflow entity model, exact Blob
+   paths, and async work request messages. E9 uses the Table entity portion
+   through `WorkflowStorageBackend` to create and retrieve the first case
+   state. The local adapter remains deterministic; the Azure adapter maps the
+   same contracts to guarded Table/Blob/Queue SDK clients. No worker,
+   notification path, document upload, applicant import, queue write, or Blob
+   artifact write uses them yet.
 
 ## 4. Contracts and versioning
 
 - **OpenAPI**: `openapi/evaluations-api.json`, generated from the app factory
   by `scripts/export_openapi.py`; `--check` exits non-zero on drift
-  (verified clean 2026-06-13; also a CI step and a test). Stable operation
-  IDs `submitEvaluation`, `getEvaluation`, and
-  `retrieveEvaluationForCopilot`; documented request headers
-  `Idempotency-Key` (submit POST) and `X-Correlation-Id` (submit POST, body
-  retrieve POST, and GET); the request schema exposes no
+  (verified clean 2026-06-13; also a CI step and a test). Stable evaluation
+  operation IDs `submitEvaluation`, `getEvaluation`, and
+  `retrieveEvaluationForCopilot`; stable case operation IDs
+  `createRecruitmentCase`, `getRecruitmentCase`, and `getCaseNextActions`.
+  Evaluation submit documents `Idempotency-Key`; all tool-facing routes
+  document `X-Correlation-Id`. Request schemas expose no
   provider/model/deployment/endpoint/agent field (test-pinned).
 - **Copilot Swagger**:
   `openapi/copilot-studio/evaluations-tool.swagger.json`, generated by
@@ -164,8 +179,9 @@ Copilot Studio manual lab topic
   is a Swagger 2.0 custom-connector artifact separate from the OpenAPI 3.1
   source contract. It exposes exactly three Copilot-facing actions:
   `submitEvaluation`, `getEvaluation`, and
-  `retrieveEvaluationForCopilot`. The retrieve wrapper accepts only body
-  field `evaluation_id`; the canonical GET route remains available.
+  `retrieveEvaluationForCopilot`. It intentionally exposes no E9 case
+  actions. The retrieve wrapper accepts only body field `evaluation_id`; the
+  canonical GET route remains available.
 - **Provider contract**: single schema source for all backends
   (`domain/schemas/provider.py`): `PROVIDER_CONTRACT_VERSION = "1.0"`,
   `ORCHESTRATION_VERSION = "council-composition-v1"`; nullable
@@ -185,8 +201,10 @@ Copilot Studio manual lab topic
   message schemas for `run-model-candidate-assessment`,
   `run-model-assessment-batch`, and `write-notification`
   (`domain/schemas/workflow_queue.py`); workflow storage protocols
-  (`persistence/workflow_storage.py`). These are internal contracts only and
-  do not change the OpenAPI/Copilot contracts.
+  (`persistence/workflow_storage.py`). E9 adds case API schemas in
+  `domain/schemas/cases.py` and uses the Table portion of these contracts for
+  public case create/read/next-action endpoints. The Copilot Swagger contract
+  remains unchanged and evaluation-only.
 
 ## 5. Persistence design (local, storage-shape-mirrored)
 
@@ -250,7 +268,10 @@ which writes E7 workflow foundation data under `<root>/workflow/`:
 
 The local adapter imports no Azure SDK modules and is selected by
 `create_app()` as `app.state.workflow_storage`. It is a deterministic
-foundation for future case/workflow facade slices.
+foundation for case/workflow facade slices. E9 uses it through
+`WorkflowStorageBackend` to create and retrieve only `RecruitmentCases`,
+`CaseParticipants`, `CaseTasks`, `WorkflowGates`, and `CaseEvents` rows. E9
+does not write workflow Blob artifacts or Queue messages.
 
 `AzureWorkflowStorageBackend` is available only when `[workflow_storage]
 backend = "azure"` is explicitly selected and
@@ -351,10 +372,12 @@ nothing below should be read as implemented:
   evaluation idempotency rows, evidence JSONL rows, review queue rows,
   Azure Table summaries, queue processing, concurrency, retention/recovery,
   and reconciliation remain local/deferred.
-- **No case-management or notification API** — E7/E8 add internal workflow
-  data contracts and adapters only. There is no `POST /api/cases`, case
-  search/open endpoint, notification endpoint, assessment-status endpoint,
-  worker, or Copilot topic wiring for those contracts.
+- **No complete case-management or notification API** — E9 adds only
+  `POST /api/cases`, `GET /api/cases/{case_id}`, and
+  `GET /api/cases/{case_id}/next-actions`. There is no case search, body-based
+  Copilot case retrieve wrapper, notification endpoint, document endpoint,
+  applicant endpoint, assessment-status endpoint, worker, or Copilot topic
+  wiring for those contracts.
 - **No prompt execution** — prompt templates are recorded provenance only;
   no prompt text is ever sent to any model.
 - **No source-controlled or production Copilot Studio integration** — one
@@ -369,7 +392,9 @@ nothing below should be read as implemented:
 - **No live model evaluations** — LE-001…LE-007 exist only as skipping stubs.
 - **No admin configuration surface or config-change audit** — config is a
   source-controlled file.
-- **No case entity / case-scoped authorization** — `case_id` is always null.
+- **No case-scoped authorization** — case endpoints still use the global
+  simulated `hr` lab role. Hiring-manager/auditor read access and true
+  per-case ACLs remain deferred.
 - **No data retention/cleanup** for the local store.
 
 ## 12. Companion documents

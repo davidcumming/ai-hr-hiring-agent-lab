@@ -1,6 +1,173 @@
 {
   "components": {
     "schemas": {
+      "CaseEnvelope": {
+        "additionalProperties": false,
+        "description": "Case-specific standard envelope.\n\nThe existing evaluation ``Envelope`` intentionally remains unchanged so\nthe E9 case surface does not alter the established evaluation API schema.",
+        "properties": {
+          "case_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Case Id"
+          },
+          "correlation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlation Id"
+          },
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "evaluation_id": {
+            "title": "Evaluation Id",
+            "type": "null"
+          },
+          "next_actions": {
+            "items": {
+              "$ref": "#/components/schemas/CaseNextAction"
+            },
+            "title": "Next Actions",
+            "type": "array"
+          },
+          "result": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "safe_details": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Safe Details"
+          },
+          "status": {
+            "enum": [
+              "completed",
+              "blocked",
+              "validation_failed",
+              "unauthorized",
+              "needs_input",
+              "error"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "user_message": {
+            "default": "",
+            "title": "User Message",
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "CaseEnvelope",
+        "type": "object"
+      },
+      "CaseNextAction": {
+        "additionalProperties": false,
+        "properties": {
+          "action_id": {
+            "title": "Action Id",
+            "type": "string"
+          },
+          "assigned_actor_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assigned Actor Id"
+          },
+          "assigned_role": {
+            "anyOf": [
+              {
+                "enum": [
+                  "hr_specialist",
+                  "hiring_manager",
+                  "interviewer",
+                  "reviewer",
+                  "auditor",
+                  "admin"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assigned Role"
+          },
+          "blocker_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Blocker Ids",
+            "type": "array"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          }
+        },
+        "required": [
+          "action_id",
+          "label",
+          "description"
+        ],
+        "title": "CaseNextAction",
+        "type": "object"
+      },
       "Envelope": {
         "additionalProperties": false,
         "properties": {
@@ -101,6 +268,88 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "HiringManagerInput": {
+        "additionalProperties": false,
+        "properties": {
+          "actor_id": {
+            "minLength": 1,
+            "title": "Actor Id",
+            "type": "string"
+          },
+          "confirmed": {
+            "default": false,
+            "title": "Confirmed",
+            "type": "boolean"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Display Name"
+          }
+        },
+        "required": [
+          "actor_id"
+        ],
+        "title": "HiringManagerInput",
+        "type": "object"
+      },
+      "RecruitmentCaseCreateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "case_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Case Title"
+          },
+          "department": {
+            "minLength": 1,
+            "title": "Department",
+            "type": "string"
+          },
+          "hiring_manager": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HiringManagerInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "recruitment_type": {
+            "minLength": 1,
+            "title": "Recruitment Type",
+            "type": "string"
+          },
+          "role_title": {
+            "minLength": 1,
+            "title": "Role Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role_title",
+          "department",
+          "recruitment_type"
+        ],
+        "title": "RecruitmentCaseCreateRequest",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -144,12 +393,150 @@
     }
   },
   "info": {
-    "description": "Advisory, evidence-grounded single-candidate evaluation (slice-e1-candidate-evaluation-council). Every result is decision support for a human reviewer (decision_support_only=true, human_review_required=true) \u2014 never a hiring decision, ranking, or candidate contact. Authentication uses SIMULATED lab identity headers (X-Lab-Actor-Id, X-Lab-Roles; the 'hr' role is required for both endpoints); this is a lab stand-in, never an Entra substitute. Envelope status vocabulary: completed | blocked | validation_failed | unauthorized are emitted; needs_input and error are RESERVED (declared, never emitted by this slice). HTTP mapping per the adopted API contracts: business outcomes return 200 with the envelope status; 400 malformed body; 401 missing identity; 403 authenticated without the required role.",
-    "title": "AI HR Hiring Agent Lab \u2014 Candidate Evaluation Council API",
+    "description": "Advisory, evidence-grounded single-candidate evaluation plus the E9 recruitment-case state foundation. Evaluation results are decision support for a human reviewer (decision_support_only=true, human_review_required=true) \u2014 never a hiring decision, ranking, or candidate contact. Case endpoints create and retrieve deterministic workflow state only; they do not import applicants, upload documents, start assessment jobs, send notifications, call Foundry/model backends, or change Copilot Studio. Authentication uses SIMULATED lab identity headers (X-Lab-Actor-Id, X-Lab-Roles; the 'hr' role is required); this is a lab stand-in, never an Entra substitute. Envelope status vocabulary: completed | blocked | validation_failed | unauthorized are emitted; needs_input and error are RESERVED. HTTP mapping per the adopted API contracts: business outcomes return 200 with the envelope status; 400 malformed body; 401 missing identity; 403 authenticated without the required role.",
+    "title": "AI HR Hiring Agent Lab API",
     "version": "1.0.0"
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/cases": {
+      "post": {
+        "description": "Creates the initial case, participant, task, gate, and event state for Stage 1 of the HR Hiring MVP workflow. This endpoint is deterministic service logic only: no applicant import, document upload, queue worker, Foundry/model execution, notification API, or Copilot Studio topic state is created.",
+        "operationId": "createRecruitmentCase",
+        "parameters": [
+          {
+            "description": "Optional caller-supplied correlation id, echoed on early failures. Completed case responses return the case correlation id.",
+            "in": "header",
+            "name": "X-Correlation-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecruitmentCaseCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Create a synthetic-safe recruitment case foundation"
+      }
+    },
+    "/api/cases/{case_id}": {
+      "get": {
+        "description": "Retrieves the persisted case summary, participants, open tasks, workflow gates, creation events, and deterministic next actions. The response does not fabricate missing workflow state.",
+        "operationId": "getRecruitmentCase",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional caller-supplied correlation id, echoed on early failures. Completed case responses return the case correlation id.",
+            "in": "header",
+            "name": "X-Correlation-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Retrieve one recruitment case state snapshot"
+      }
+    },
+    "/api/cases/{case_id}/next-actions": {
+      "get": {
+        "description": "Returns open or blocked tasks and active gate blockers in business language. No model-generated recommendations, notifications, or Copilot topic-variable state are produced.",
+        "operationId": "getCaseNextActions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional caller-supplied correlation id, echoed on early failures. Completed case responses return the case correlation id.",
+            "in": "header",
+            "name": "X-Correlation-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Retrieve deterministic next actions for one recruitment case"
+      }
+    },
     "/api/evaluations": {
       "post": {
         "description": "Advisory-only: every result carries decision_support_only=true and human_review_required=true. Business outcomes (completed | blocked | validation_failed) return HTTP 200 with the status in the envelope; malformed bodies return HTTP 400; missing identity 401; authenticated callers without the 'hr' role 403 (envelope status 'unauthorized'). Envelope statuses 'needs_input' and 'error' are reserved and never emitted by this slice.",

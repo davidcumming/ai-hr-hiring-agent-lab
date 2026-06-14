@@ -225,7 +225,7 @@ class RecruitmentCase(CasePartitionedWorkflowEntity):
     current_stage: str
     current_gate: str
     hr_owner_actor_id: str
-    primary_hiring_manager_actor_id: str
+    primary_hiring_manager_actor_id: str | None = None
     target_start_date: str | None = None
     posting_period_start: str | None = None
     posting_period_end: str | None = None

@@ -24,13 +24,17 @@ overlay Azure Blob persistence for evaluation audit records/artifacts when
 `HRHA_STORAGE_BACKEND=azure_blob` and `HRHA_ENABLE_AZURE_STORAGE=true`.
 The API exposes `submitEvaluation`, the canonical explicit-ID
 `getEvaluation`, and the body-based `retrieveEvaluationForCopilot` wrapper
-for Copilot Studio topic-variable binding.
+for Copilot Studio topic-variable binding. It also exposes the E9 case
+foundation endpoints: `createRecruitmentCase`, `getRecruitmentCase`, and
+`getCaseNextActions`.
 
-The repo also contains the E7 workflow storage foundation for the future MVP
-case workflow: strict internal Table-shaped entity schemas, canonical Blob
-path builders, Queue message contracts, and a deterministic local workflow
-store. These contracts are not yet public API endpoints, workers, Copilot
-topics, or live Azure Table/Queue adapters.
+The repo also contains the E7/E8 workflow storage foundation for the future
+MVP case workflow: strict Table-shaped entity schemas, canonical Blob path
+builders, Queue message contracts, a deterministic local workflow store, and
+guarded Azure Table/Blob/Queue adapters. E9 uses the Table portion for the
+first public case facade only. There are still no workers, Copilot case
+topics, document/applicant/notification APIs, queue writes, Blob artifact
+writes, or live Azure workflow smoke in the default path.
 
 Foundry-facing surfaces exist only as **fail-closed, non-functional
 scaffolds**: the three Foundry provider scaffolds raise safe configuration
@@ -58,7 +62,7 @@ Copilot ALM export, durable screenshot/export/transcript, production identity,
 or live Foundry execution exists.
 
 A deterministic test suite (`tests/`, DT-001…DT-018 plus RP and smoke
-coverage) covers the behavior described here: 259 tests pass, 7 live-eval
+coverage) covers the behavior described here: 293 tests pass, 7 live-eval
 stubs skip with a documented deferral rationale, 0 fail (verified run,
 2026-06-13).
 
@@ -66,7 +70,7 @@ stubs skip with a documented deferral rationale, 0 fail (verified run,
 
 | Document | Contents |
 |---|---|
-| [`candidate-evaluation-council.md`](./candidate-evaluation-council.md) | The full behavior reference: API endpoints (operation IDs, idempotency/correlation headers), envelope and error model, simulated auth, council orchestration and modes, rigor and escalation, quality gates, evidence packet, persistence (artifact tree, summary rows, storage-backend seam, E7 workflow storage foundation) and audit record, idempotency, review queue, CLI and local scripts, configuration surface and environment guards, prompt registry, fixtures, logging guarantees, and limitations. |
+| [`candidate-evaluation-council.md`](./candidate-evaluation-council.md) | The full behavior reference: API endpoints (operation IDs, idempotency/correlation headers), envelope and error model, simulated auth, case foundation behavior, council orchestration and modes, rigor and escalation, quality gates, evidence packet, persistence (artifact tree, summary rows, storage-backend seam, E7/E8 workflow storage foundation) and audit record, idempotency, review queue, CLI and local scripts, configuration surface and environment guards, prompt registry, fixtures, logging guarantees, and limitations. |
 
 ## How these docs relate to other documentation
 

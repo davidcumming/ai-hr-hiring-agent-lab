@@ -1,10 +1,10 @@
-# Candidate Evaluation Council — Current Behavior
+# Candidate Evaluation Council and Case Foundation — Current Behavior
 
 Present-tense reference for what the system does today. Sources: the modules
 under `src/hr_eval_lab/`, `config/lab-config.toml`, `fixtures/`,
 `openapi/evaluations-api.json`, and the deterministic test suite under
 `tests/` (DT-001…DT-018 plus the RP storage/provider/prompt/contract suite;
-259 passed / 7 deferred-live-eval skips / 0 failed, verified 2026-06-13).
+293 passed / 7 deferred-live-eval skips / 0 failed, verified 2026-06-13).
 Claims that rest on code inspection alone (no dedicated test) are flagged
 inline.
 
@@ -12,9 +12,11 @@ inline.
 
 The system evaluates **one synthetic candidate against one position rubric**
 and returns an **advisory, evidence-grounded** evaluation for a human
-reviewer. It never makes a hiring decision, never ranks candidates, never
-contacts anyone — the result schema has no field capable of expressing any of
-those (`src/hr_eval_lab/domain/schemas/evaluation.py`; DT-010, DT-017).
+reviewer. It also exposes the first **synthetic-safe recruitment case state**
+API: create a case, retrieve a case, and retrieve deterministic next actions.
+It never makes a hiring decision, never ranks candidates, never contacts
+anyone — the evaluation result schema has no field capable of expressing any
+of those (`src/hr_eval_lab/domain/schemas/evaluation.py`; DT-010, DT-017).
 
 Everything runs locally and deterministically:
 
@@ -23,7 +25,7 @@ Everything runs locally and deterministically:
   normalizing run identity (evaluation id, derived correlation id, two
   timestamps) — DT-002.
 - There is **no live model**, no repo-created Azure resource, no Entra
-  identity, no production Copilot Studio surface, and no network dependency
+identity, no production Copilot Studio surface, and no network dependency
   in the normal local runtime path. The Azure Functions wrapper and
   Azure Blob backend support already-created lab resources when explicitly
   configured. A manual Copilot Studio lab topic exists for one synthetic
@@ -33,11 +35,13 @@ Everything runs locally and deterministically:
   errors on any use (see §13, §15 and
   `../architecture/provider-and-storage-seams.md`). Live Foundry wiring is
   deferred and human-gated.
-- E7 defines internal workflow storage contracts for the future MVP case
-  workflow: 18 Azure Table-shaped entities, canonical Blob path builders,
-  three Queue message contracts, and a deterministic local workflow store.
-  These contracts are not yet public API endpoints, workers, Copilot topics,
-  or live Azure Table/Queue adapters.
+- E7/E8 define workflow storage contracts for the MVP case workflow: 18 Azure
+  Table-shaped entities, canonical Blob path builders, three Queue message
+  contracts, a deterministic local workflow store, and a guarded Azure
+  Table/Blob/Queue adapter. E9 wires the Table side into the first case API
+  endpoints. Workflow Blob artifacts, Queue messages, workers, Copilot topics,
+  applicant import, documents, notifications, and live Azure resource creation
+  remain deferred.
 
 ## 2. HTTP API
 
@@ -54,13 +58,16 @@ spec validation in the test suite.
 | `POST` | `/api/evaluations` | `submitEvaluation` | Submit one candidate evaluation to the council. |
 | `POST` | `/api/evaluations/retrieve` | `retrieveEvaluationForCopilot` | Retrieve the persisted full audit record using a JSON body field `evaluation_id`; this is the Copilot-friendly topic-variable binding shape. |
 | `GET` | `/api/evaluations/{evaluation_id}` | `getEvaluation` | Retrieve the persisted full audit record by explicit path `evaluation_id`; this remains the canonical HTTP read for explicit-ID clients. |
+| `POST` | `/api/cases` | `createRecruitmentCase` | Create the initial recruitment case state. |
+| `GET` | `/api/cases/{case_id}` | `getRecruitmentCase` | Retrieve one persisted recruitment case state snapshot. |
+| `GET` | `/api/cases/{case_id}/next-actions` | `getCaseNextActions` | Retrieve deterministic next actions, open tasks, and active gate blockers. |
 
 ### Request headers
 
 | Header | Endpoints | Behavior |
 |---|---|---|
-| `Idempotency-Key` | POST | Equivalent to the body field `idempotency_key`. At least one of the two is required (neither → HTTP 400); if both are present they must be identical (mismatch → HTTP 400). |
-| `X-Correlation-Id` | POST submit, POST retrieve, GET | Optional caller-supplied correlation id. The response carries an `X-Correlation-Id` header when an envelope correlation id exists (completed/blocked/replayed POST submit, successful GET or body-based retrieve — the server-assigned id, also present in the envelope) or when the caller supplied the header (echoed back). Early-failure responses (HTTP 400/401/403 and `validation_failed` envelopes with no assigned correlation id) carry the header only if the caller sent one. |
+| `Idempotency-Key` | `POST /api/evaluations` | Equivalent to the body field `idempotency_key`. At least one of the two is required (neither → HTTP 400); if both are present they must be identical (mismatch → HTTP 400). Case creation does not use idempotency yet. |
+| `X-Correlation-Id` | All current endpoints | Optional caller-supplied correlation id. The response carries an `X-Correlation-Id` header when an envelope correlation id exists (completed/blocked/replayed evaluation submit, successful evaluation retrieve, successful case create/read/next-actions) or when the caller supplied the header (echoed back). Early-failure responses (HTTP 400/401/403 and `validation_failed` envelopes with no assigned correlation id) carry the header only if the caller sent one. |
 
 The request schema contains **no** provider/model/deployment/endpoint/agent
 field — provider selection is server-side configuration only (test-pinned).
@@ -86,12 +93,39 @@ field — provider selection is server-side configuration only (test-pinned).
 |---|---|---|
 | `evaluation_id` | yes | The evaluation id returned by `submitEvaluation`. The body field exists so Copilot Studio topic/workflow variables can bind the stored id into the retrieve action without relying on path-parameter persistence. |
 
+### Request body (`POST /api/cases`)
+
+`RecruitmentCaseCreateRequest` (`domain/schemas/cases.py`,
+`extra="forbid"`):
+
+| Field | Required | Notes |
+|---|---|---|
+| `role_title` | yes | Synthetic-safe role title. |
+| `department` | yes | Synthetic-safe department/business unit. |
+| `recruitment_type` | yes | Free-form constrained only to non-empty text for E9. |
+| `case_title` | no | If absent, derived as `{role_title} - {department}`. |
+| `hiring_manager` | no | Optional object with `actor_id`, optional `display_name`, and `confirmed` boolean. |
+
+The schema rejects extra fields. It does not accept applicant data, resume
+text, documents, rubric content, candidate refs, provider selection, backend
+selection, or Copilot topic state.
+
 ### Response envelope
 
-Every response body is the standard envelope (`api/envelope.py`):
-`status`, `evaluation_id`, `case_id` (**always null** — there is no case
-entity), `correlation_id`, `user_message`, `safe_details`, `result`,
-`errors`, `warnings`.
+Evaluation responses use the standard envelope (`api/envelope.py`):
+`status`, `evaluation_id`, `case_id` (**always null for evaluation routes**),
+`correlation_id`, `user_message`, `safe_details`, `result`, `errors`,
+`warnings`.
+
+Case responses use the case envelope (`domain/schemas/cases.py`) with the
+same standard envelope fields plus `next_actions`: `status`, `evaluation_id`
+(always null for case routes), `case_id`, `correlation_id`, `user_message`,
+`safe_details`, `result`, `next_actions`, `errors`, `warnings`.
+
+`POST /api/cases` and `GET /api/cases/{case_id}` return `result` with case
+summary, participants, open tasks, gates, creation events, and next actions.
+`GET /api/cases/{case_id}/next-actions` returns `result` with `case_id`, open
+tasks, blocked tasks, active gate blockers, and deterministic next actions.
 
 Emitted status vocabulary: `completed | blocked | validation_failed |
 unauthorized`. `needs_input` and `error` are **declared but reserved — never
@@ -127,6 +161,16 @@ extra field returns HTTP 400. The shared retrieve behavior returns the full
 persisted audit record inside `result` (status `completed`), or
 `validation_failed` for an unknown id.
 
+The case handlers authenticate and authorize first. `POST /api/cases` then
+validates the request body and creates one `RecruitmentCases` row, one HR
+owner `CaseParticipants` row, an optional hiring-manager participant row,
+initial `CaseTasks`, initial `WorkflowGates`, and one `CaseEvents` row. `GET`
+case and `GET` next-actions are read-only and do not write `case_opened` or
+`case_status_viewed` events. Unknown case ids return `validation_failed` with
+`errors=["unknown_case_id"]`. Next actions are hard-coded business-language
+messages derived from persisted tasks and gates; no model recommendation is
+generated.
+
 ### Copilot-facing action contract and lab topic workflow
 
 The curated Swagger 2.0 artifact
@@ -137,7 +181,9 @@ OpenAPI 3.1 contract. It exposes exactly three Copilot-facing actions:
 The submit request remains fixture-reference-only for Copilot Studio
 registration: `position_id`, `candidate_ref`, optional `idempotency_key`,
 optional `evaluation_question`, and optional `requested_rigor`; inline resume
-and cover-letter text are not exposed in the curated connector artifact.
+and cover-letter text are not exposed in the curated connector artifact. E9
+case endpoints are present only in the source OpenAPI contract; the curated
+Copilot Swagger intentionally exposes no case actions.
 
 A manual Copilot Studio lab topic workflow exists for one synthetic sample
 candidate path:
@@ -165,7 +211,7 @@ Identity is a **simulated lab stand-in**, not a real identity system
 (`api/auth.py`): headers `X-Lab-Actor-Id` (required), `X-Lab-Roles`
 (comma-separated), optional `X-Lab-Actor-Display`. The known role vocabulary
 is `hr, hiring_manager, reviewer, auditor, admin_lab, admin_prod, support`,
-but **only `hr` authorizes either endpoint** — all other roles, including
+but **only `hr` authorizes the current API endpoints** — all other roles, including
 `admin_lab`, are rejected (DT-009). Authorization is case-less (global role
 group only; no per-case ACL exists). The authenticated actor id, roles, and
 resolving role are persisted on every audit record. This mechanism is never
@@ -530,7 +576,7 @@ script's stdout is test-verified to contain no resume or prompt text.
   messages, local workflow store, and non-goals).
   `tests/live_evals/test_le_stubs.py` holds LE-001…LE-007 stubs that **skip**
   with a documented rationale (no live model behavior exists to evaluate).
-  Verified result (2026-06-13): 259 passed, 7 skipped, 0 failed.
+  Verified result (2026-06-13): 293 passed, 7 skipped, 0 failed.
 - `.github/workflows/ci.yml` — on PR and push to main: Python 3.10,
   `pip install -e ".[dev]"`, `pytest -q`, and the OpenAPI drift check. No
   cloud credentials, no deployment.

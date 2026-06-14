@@ -46,13 +46,25 @@ def test_routes_and_status_vocabulary_conform():
     spec = _committed_spec()
     paths = spec["paths"]
     assert set(paths) == {
+        "/api/cases",
+        "/api/cases/{case_id}",
+        "/api/cases/{case_id}/next-actions",
         "/api/evaluations",
         "/api/evaluations/retrieve",
         "/api/evaluations/{evaluation_id}",
     }
+    assert "post" in paths["/api/cases"]
+    assert "get" in paths["/api/cases/{case_id}"]
+    assert "get" in paths["/api/cases/{case_id}/next-actions"]
     assert "post" in paths["/api/evaluations"]
     assert "post" in paths["/api/evaluations/retrieve"]
     assert "get" in paths["/api/evaluations/{evaluation_id}"]
+    assert paths["/api/cases"]["post"]["operationId"] == "createRecruitmentCase"
+    assert paths["/api/cases/{case_id}"]["get"]["operationId"] == "getRecruitmentCase"
+    assert (
+        paths["/api/cases/{case_id}/next-actions"]["get"]["operationId"]
+        == "getCaseNextActions"
+    )
     assert (
         paths["/api/evaluations/retrieve"]["post"]["operationId"]
         == "retrieveEvaluationForCopilot"
@@ -86,3 +98,33 @@ def test_routes_and_status_vocabulary_conform():
     ]["application/json"]["schema"]
     assert set(retrieve_schema["properties"]) == {"evaluation_id"}
     assert retrieve_schema["required"] == ["evaluation_id"]
+
+    case_request_body = paths["/api/cases"]["post"]["requestBody"]
+    case_request_schema = case_request_body["content"]["application/json"]["schema"]
+    assert case_request_schema == {
+        "$ref": "#/components/schemas/RecruitmentCaseCreateRequest"
+    }
+    assert "$defs" not in case_request_schema
+    assert "#/$defs/" not in json.dumps(case_request_body)
+
+    components = spec["components"]["schemas"]
+    assert "RecruitmentCaseCreateRequest" in components
+    assert "HiringManagerInput" in components
+    create_case_component = components["RecruitmentCaseCreateRequest"]
+    assert "$defs" not in create_case_component
+    assert {
+        "role_title",
+        "department",
+        "recruitment_type",
+        "case_title",
+        "hiring_manager",
+    } == set(create_case_component["properties"])
+    assert create_case_component["required"] == [
+        "role_title",
+        "department",
+        "recruitment_type",
+    ]
+
+    case_envelope = spec["components"]["schemas"]["CaseEnvelope"]
+    assert "next_actions" in case_envelope["properties"]
+    assert "case_id" in case_envelope["properties"]
