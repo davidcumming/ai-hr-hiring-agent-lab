@@ -8,10 +8,11 @@ import pytest
 from pydantic import ValidationError
 
 from hr_eval_lab.config import AzureStorageConfig, WorkflowStorageConfig
-from hr_eval_lab.domain.schemas.workflow import CandidatePackage
+from hr_eval_lab.domain.schemas.workflow import CandidatePackage, CaseParticipant
 from hr_eval_lab.domain.schemas.workflow_artifacts import candidate_package_path
 from hr_eval_lab.domain.schemas.workflow_queue import RunModelCandidateAssessmentMessage
 from hr_eval_lab.persistence.azure_workflow_storage import AzureWorkflowStorageBackend
+from hr_eval_lab.persistence.workflow_store import LocalWorkflowStore
 from hr_eval_lab.persistence.workflow_storage import WorkflowStorageNotConfiguredError
 from tests.fake_blob import FakeBlobContainerClient, ResourceNotFoundError
 
@@ -161,6 +162,19 @@ def _candidate_package() -> CandidatePackage:
     )
 
 
+def _case_participant() -> CaseParticipant:
+    return CaseParticipant(
+        PartitionKey="case-e8#keys",
+        RowKey="hr_specialist#u-hr",
+        created_at="2026-06-13T00:00:00Z",
+        correlation_id="corr-e8-keys",
+        case_id="case-e8#keys",
+        actor_id="u-hr",
+        display_name="Synthetic HR",
+        case_role="hr_specialist",
+    )
+
+
 def _message() -> RunModelCandidateAssessmentMessage:
     return RunModelCandidateAssessmentMessage(
         case_id="case-e8-001",
@@ -259,6 +273,65 @@ def test_e8_azure_table_upsert_uses_replace_and_decodes_json_fields(monkeypatch)
         )
         is None
     )
+
+
+def test_e8_azure_table_keys_are_encoded_only_at_adapter_boundary(monkeypatch):
+    backend, table_service, _, _ = _backend(monkeypatch)
+    participant = _case_participant()
+
+    row = backend.upsert_table_entity(participant)
+    table = table_service.tables["E8CaseParticipants"]
+
+    assert row["PartitionKey"] == "case-e8#keys"
+    assert row["RowKey"] == "hr_specialist#u-hr"
+    assert ("case-e8%23keys", "hr_specialist%23u-hr") in table.rows
+    assert ("case-e8#keys", "hr_specialist#u-hr") not in table.rows
+
+    restored = backend.get_table_entity(
+        CaseParticipant,
+        "case-e8#keys",
+        "hr_specialist#u-hr",
+    )
+    listed = backend.list_table_entities(
+        CaseParticipant,
+        partition_key="case-e8#keys",
+    )
+
+    assert restored is not None
+    assert restored.PartitionKey == "case-e8#keys"
+    assert restored.RowKey == "hr_specialist#u-hr"
+    assert restored.case_id == "case-e8#keys"
+    assert listed[0].PartitionKey == "case-e8#keys"
+    assert listed[0].RowKey == "hr_specialist#u-hr"
+    assert "%23" not in restored.RowKey
+    assert "%23" not in listed[0].PartitionKey
+
+    assert backend.delete_table_entity(
+        CaseParticipant,
+        "case-e8#keys",
+        "hr_specialist#u-hr",
+    )
+    assert ("case-e8%23keys", "hr_specialist%23u-hr") not in table.rows
+
+
+def test_e8_local_workflow_store_keeps_logical_table_keys(tmp_path):
+    store = LocalWorkflowStore(tmp_path)
+    participant = _case_participant()
+
+    row = store.upsert_table_entity(participant)
+    stored_rows = store.list_table_rows("CaseParticipants", partition_key="case-e8#keys")
+    restored = store.get_table_entity(
+        CaseParticipant,
+        "case-e8#keys",
+        "hr_specialist#u-hr",
+    )
+
+    assert row["PartitionKey"] == "case-e8#keys"
+    assert row["RowKey"] == "hr_specialist#u-hr"
+    assert stored_rows[0]["PartitionKey"] == "case-e8#keys"
+    assert stored_rows[0]["RowKey"] == "hr_specialist#u-hr"
+    assert restored is not None
+    assert restored.RowKey == "hr_specialist#u-hr"
 
 
 def test_e8_azure_blob_uses_canonical_path_as_blob_name(monkeypatch):

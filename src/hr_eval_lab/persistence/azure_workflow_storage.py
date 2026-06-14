@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 from typing import Any
+from urllib.parse import quote, unquote
 
 from pydantic import BaseModel
 
@@ -78,6 +79,22 @@ def _message_content(message: Any) -> str:
     if isinstance(content, bytes):
         return content.decode("utf-8")
     return str(content)
+
+
+def _encode_table_key(value: str) -> str:
+    """Encode logical workflow Table keys for Azure Table Storage.
+
+    Domain RowKey conventions intentionally use values such as
+    ``task#complete_role_intake``. Azure Table Storage rejects ``#``, ``/``,
+    ``\\``, ``?``, and control characters in PartitionKey/RowKey, so the
+    Azure adapter percent-encodes keys at the physical boundary only.
+    """
+
+    return quote(value, safe="-._~")
+
+
+def _decode_table_key(value: str) -> str:
+    return unquote(value)
 
 
 def _build_real_clients(
@@ -196,7 +213,7 @@ class AzureWorkflowStorageBackend:
     def upsert_table_entity(self, entity: WorkflowTableEntity) -> dict[str, Any]:
         row = entity.to_table_entity()
         response = self._table_client(entity.table_name).upsert_entity(
-            entity=row,
+            entity=self._azure_table_row(row),
             mode=self._table_replace_mode,
         )
         etag = self._etag_from_response(response)
@@ -212,14 +229,14 @@ class AzureWorkflowStorageBackend:
     ) -> WorkflowTableEntity | None:
         try:
             raw = self._table_client(model.table_name).get_entity(
-                partition_key=partition_key,
-                row_key=row_key,
+                partition_key=_encode_table_key(partition_key),
+                row_key=_encode_table_key(row_key),
             )
         except Exception as exc:
             if _is_not_found(exc):
                 return None
             raise
-        return model.from_table_entity(self._row_with_etag(raw))
+        return model.from_table_entity(self._logical_table_row(raw))
 
     def list_table_entities(
         self,
@@ -230,9 +247,9 @@ class AzureWorkflowStorageBackend:
         if partition_key is None:
             rows = table.list_entities()
         else:
-            escaped = partition_key.replace("'", "''")
+            escaped = _encode_table_key(partition_key).replace("'", "''")
             rows = table.query_entities(query_filter=f"PartitionKey eq '{escaped}'")
-        return [model.from_table_entity(self._row_with_etag(row)) for row in rows]
+        return [model.from_table_entity(self._logical_table_row(row)) for row in rows]
 
     def delete_table_entity(
         self,
@@ -242,8 +259,8 @@ class AzureWorkflowStorageBackend:
     ) -> bool:
         try:
             self._table_client(model.table_name).delete_entity(
-                partition_key=partition_key,
-                row_key=row_key,
+                partition_key=_encode_table_key(partition_key),
+                row_key=_encode_table_key(row_key),
             )
         except Exception as exc:
             if _is_not_found(exc):
@@ -408,6 +425,18 @@ class AzureWorkflowStorageBackend:
             return str(value) if value else None
         value = getattr(response, "etag", None)
         return str(value) if value else None
+
+    def _azure_table_row(self, row: dict[str, Any]) -> dict[str, Any]:
+        encoded = dict(row)
+        encoded["PartitionKey"] = _encode_table_key(str(row["PartitionKey"]))
+        encoded["RowKey"] = _encode_table_key(str(row["RowKey"]))
+        return encoded
+
+    def _logical_table_row(self, raw: Any) -> dict[str, Any]:
+        row = self._row_with_etag(raw)
+        row["PartitionKey"] = _decode_table_key(str(row["PartitionKey"]))
+        row["RowKey"] = _decode_table_key(str(row["RowKey"]))
+        return row
 
     def _row_with_etag(self, raw: Any) -> dict[str, Any]:
         row = dict(raw)

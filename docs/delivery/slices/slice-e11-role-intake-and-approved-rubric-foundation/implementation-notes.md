@@ -88,6 +88,13 @@ tool surface.
 - The Queue probe skips receive/delete when the configured workflow queue is
   not empty, so it does not delete existing workflow messages.
 
+Manual Gate A also surfaced an Azure Table key compatibility issue: logical
+workflow RowKeys intentionally contain `#` separators, but Azure Table
+Storage rejects `#` in `PartitionKey` and `RowKey`. The Azure workflow
+storage adapter now percent-encodes Table keys only at the Azure boundary and
+decodes them before returning domain objects. Local workflow storage and the
+domain RowKey conventions remain unchanged.
+
 ## Boundaries Preserved
 
 - No Copilot Studio topic, connector action, or curated role/rubric Swagger was
