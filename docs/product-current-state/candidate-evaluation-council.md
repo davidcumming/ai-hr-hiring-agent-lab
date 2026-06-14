@@ -4,7 +4,7 @@ Present-tense reference for what the system does today. Sources: the modules
 under `src/hr_eval_lab/`, `config/lab-config.toml`, `fixtures/`,
 `openapi/evaluations-api.json`, and the deterministic test suite under
 `tests/` (DT-001…DT-018 plus the RP storage/provider/prompt/contract suite;
-293 passed / 7 deferred-live-eval skips / 0 failed, verified 2026-06-13).
+314 passed / 7 deferred-live-eval skips / 0 failed, verified 2026-06-14).
 Claims that rest on code inspection alone (no dedicated test) are flagged
 inline.
 
@@ -39,10 +39,12 @@ identity, no production Copilot Studio surface, and no network dependency
   Table-shaped entities, canonical Blob path builders, three Queue message
   contracts, a deterministic local workflow store, and a guarded Azure
   Table/Blob/Queue adapter. The case API uses the Table side for initial case
-  state and uses the Blob side only for narrow role source-document intake.
-  Queue messages, workers, Copilot topics, applicant import, candidate
-  documents, notifications, document download/read APIs, and live Azure
-  resource creation remain deferred.
+  state, source-document metadata, role-intake/rubric artifact versions,
+  rubric approval metadata, and events. It uses the Blob side for narrow role
+  source-document intake and synthetic role-intake/rubric artifacts. Queue
+  messages, workers, Copilot topics, applicant import, candidate documents,
+  notifications, assessment readiness unlock, document download/read APIs, and
+  live Azure resource creation remain deferred.
 
 ## 2. HTTP API
 
@@ -65,6 +67,11 @@ spec validation in the test suite.
 | `POST` | `/api/cases/{case_id}/source-documents` | `registerSourceDocument` | Register one small synthetic role source document and store its raw text through the workflow Blob seam. |
 | `GET` | `/api/cases/{case_id}/source-documents` | `listCaseSourceDocuments` | List persisted source-document metadata summaries for one case. |
 | `GET` | `/api/cases/{case_id}/source-documents/{document_id}` | `getCaseSourceDocument` | Retrieve one persisted source-document metadata summary. |
+| `POST` | `/api/cases/{case_id}/role-intake` | `createRoleIntakeArtifact` | Create the current synthetic role-intake artifact from registered source-document metadata. |
+| `GET` | `/api/cases/{case_id}/role-intake` | `getCaseRoleIntake` | Retrieve the current role-intake artifact and version metadata. |
+| `POST` | `/api/cases/{case_id}/rubrics` | `registerApprovedRubric` | Register one approved synthetic screening rubric version. |
+| `GET` | `/api/cases/{case_id}/rubrics` | `listCaseRubrics` | List persisted rubric artifact versions for one case. |
+| `GET` | `/api/cases/{case_id}/rubrics/{rubric_version}` | `getCaseRubric` | Retrieve one approved rubric artifact version. |
 
 ### Request headers
 
@@ -133,6 +140,49 @@ The schema rejects extra fields. It does not accept client-supplied document
 IDs, hashes, sizes, Blob paths, candidate IDs, queue hints, processing status,
 multipart upload, binary file upload, metadata-only registration, or
 structured artifact payloads.
+
+### Request body (`POST /api/cases/{case_id}/role-intake`)
+
+`RoleIntakeCreateRequest` (`domain/schemas/cases.py`, `extra="forbid"`):
+
+| Field | Required | Notes |
+|---|---|---|
+| `synthetic` | yes | Must be `true`. |
+| `intake_title` | yes | Safe title for the synthetic role-intake artifact. |
+| `role_purpose` | yes | Structured synthetic role purpose. |
+| `responsibilities` | yes | Non-empty list. |
+| `required_qualifications` | yes | Non-empty list. |
+| `intake_version` | no | Defaults to `v1`; duplicate versions are rejected. |
+| `preferred_qualifications` | no | Optional list. |
+| `business_context` | no | Optional synthetic business context. |
+| `role_risks` | no | Optional list of role/workflow risks. |
+| `open_questions` | no | Optional list. |
+| `source_document_ids` | no | Optional explicit registered source-document ids; if absent, all registered case role-source documents are referenced. |
+
+The schema rejects extra fields. It does not accept applicant/candidate
+content, resume or cover-letter text, provider/model/backend selection,
+queue hints, assessment flags, or client-supplied artifact ids, Blob paths,
+hashes, or approval ids.
+
+### Request body (`POST /api/cases/{case_id}/rubrics`)
+
+`ApprovedRubricRegisterRequest` (`domain/schemas/cases.py`,
+`extra="forbid"`):
+
+| Field | Required | Notes |
+|---|---|---|
+| `synthetic` | yes | Must be `true`. |
+| `rubric_title` | yes | Safe title for the approved synthetic rubric. |
+| `criteria` | yes | Non-empty list of strict synthetic criteria. |
+| `rubric_version` | no | Defaults to `v1`; duplicate versions are rejected. |
+| `approved_by_actor_id` | no | If supplied, must match the authenticated HR actor; otherwise derived from the actor. |
+
+Each criterion has `criterion_id`, `label`, `description`, positive `weight`,
+`rating_scale`, and optional `evidence_expectations`. Each rating-scale anchor
+has `score`, `label`, and `description`. The schema rejects extra fields,
+candidate/applicant content, provider/model/backend selection, queue hints,
+assessment flags, client-supplied Blob paths/hashes/artifact ids, and
+client-supplied approval ids.
 
 ### Response envelope
 
@@ -208,6 +258,26 @@ return persisted metadata summaries only; they do not read or expose raw
 document text. Unknown document ids return `validation_failed` with
 `errors=["unknown_document_id"]`.
 
+The role-intake/rubric handlers authenticate and authorize first. `POST
+/api/cases/{case_id}/role-intake` validates a strict JSON body, requires an
+existing case and at least one registered role source document, writes a full
+synthetic role-intake artifact to
+`case-artifacts/cases/{case_id}/intake/{version}/intake.json`, writes one
+approved `ArtifactVersions` row, writes one `CaseEvents` row with
+`event_type="role_intake_artifact_created"`, updates
+`RecruitmentCases.active_intake_version`, and completes/satisfies existing
+role-intake task/gate rows when present. `POST /api/cases/{case_id}/rubrics`
+validates a strict synthetic rubric, writes a full rubric artifact to
+`case-artifacts/cases/{case_id}/rubric/{version}/rubric.json`, writes one
+approved `ArtifactVersions` row, writes one `Approvals` row, writes one
+`CaseEvents` row with `event_type="rubric_approved"`, updates
+`RecruitmentCases.active_rubric_version`, and satisfies the existing
+`rubric_approval_required` gate when present. Duplicate role-intake or rubric
+versions return `validation_failed`; unknown rubric versions return
+`validation_failed`. These handlers do not fabricate missing task/gate rows,
+do not expose raw source-document text, do not enqueue work, and do not unlock
+`assessment_unlocked`.
+
 ### Copilot-facing action contract and lab topic workflow
 
 The curated Swagger 2.0 artifact
@@ -218,10 +288,10 @@ OpenAPI 3.1 contract. It exposes exactly three Copilot-facing actions:
 The submit request remains fixture-reference-only for Copilot Studio
 registration: `position_id`, `candidate_ref`, optional `idempotency_key`,
 optional `evaluation_question`, and optional `requested_rigor`; inline resume
-and cover-letter text are not exposed in the curated connector artifact. Case
-and source-document endpoints are present only in the source OpenAPI contract;
-the curated Copilot Swagger intentionally exposes no case or source-document
-actions.
+and cover-letter text are not exposed in the curated connector artifact. Case,
+source-document, role-intake, and rubric endpoints are present only in the
+source OpenAPI contract; the curated Copilot Swagger intentionally exposes no
+case workflow actions.
 
 A manual Copilot Studio lab topic workflow exists for one synthetic sample
 candidate path:

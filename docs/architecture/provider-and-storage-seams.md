@@ -170,7 +170,11 @@ seam for the first recruitment-case endpoints: `POST /api/cases`,
 `GET /api/cases/{case_id}`, `GET /api/cases/{case_id}/next-actions`,
 `POST /api/cases/{case_id}/source-documents`,
 `GET /api/cases/{case_id}/source-documents`, and
-`GET /api/cases/{case_id}/source-documents/{document_id}`.
+`GET /api/cases/{case_id}/source-documents/{document_id}`. E11 adds
+role-intake and approved-rubric artifact routes on the same seam:
+`POST/GET /api/cases/{case_id}/role-intake`, `POST/GET
+/api/cases/{case_id}/rubrics`, and `GET
+/api/cases/{case_id}/rubrics/{rubric_version}`.
 
 - `domain/schemas/workflow.py` defines 18 Table-shaped MVP workflow entities
   (`RecruitmentCases`, `CaseParticipants`, `CaseTasks`, `CaseEvents`,
@@ -185,8 +189,9 @@ seam for the first recruitment-case endpoints: `POST /api/cases`,
   Critical workflow RowKeys enforce their expected prefixes.
 - `domain/schemas/workflow_artifacts.py` defines the canonical Blob paths for
   case documents, case artifacts, model assessment records, human reviews, and
-  final evaluation reports. Path builders reject traversal, leading slashes,
-  query strings, non-normalized paths, and unknown container prefixes.
+  final evaluation reports, including E11 role-intake artifacts and approved
+  rubric artifacts. Path builders reject traversal, leading slashes, query
+  strings, non-normalized paths, and unknown container prefixes.
 - `domain/schemas/workflow_queue.py` defines Queue message contracts for
   `run-model-candidate-assessment`, `run-model-assessment-batch`, and
   `write-notification`; messages reject raw-content and secret markers even
@@ -195,15 +200,19 @@ seam for the first recruitment-case endpoints: `POST /api/cases`,
   `WorkflowTableStore`, `WorkflowBlobStore`, `WorkflowQueueStore`, and the
   composed `WorkflowStorageBackend`. `select_workflow_storage()` resolves the
   backend lazily from `[workflow_storage]`.
-- `cases/service.py` and `cases/source_documents.py` depend only on
+- `cases/service.py`, `cases/source_documents.py`, and
+  `cases/role_intake_rubrics.py` depend only on
   `WorkflowStorageBackend`. The case service creates and reads
   `RecruitmentCases`, `CaseParticipants`, `CaseTasks`, `WorkflowGates`, and
   `CaseEvents` rows. The source-document service writes small synthetic role
   source text through the canonical `role_source_raw_path()` Blob path, then
   writes `SourceDocuments` and `CaseEvents` rows and deterministic task/gate
-  updates. These services do not import concrete local/Azure adapters, Azure
-  SDKs, provider code, Queue writers, applicant/candidate package code, or
-  Copilot tooling.
+  updates. The role-intake/rubric service writes synthetic role-intake and
+  rubric artifacts through canonical Blob paths, records `ArtifactVersions`,
+  records a rubric `Approvals` row, updates active case versions, writes
+  business events, and satisfies only existing prerequisite gates. These
+  services do not import concrete local/Azure adapters, Azure SDKs, provider
+  code, Queue writers, applicant/candidate package code, or Copilot tooling.
 - `LocalWorkflowStore` persists these shapes under `<root>/workflow/` using
   JSONL Table rows, local files for Blob artifacts, and JSONL Queue messages.
   It imports no Azure SDKs, performs no network I/O, and remains the default.
@@ -216,10 +225,11 @@ seam for the first recruitment-case endpoints: `POST /api/cases`,
   pass; deterministic tests inject fake clients.
 
 The case facade is a narrow public API use of the workflow Table contracts
-and one role-source Blob path. It is **not** a worker, resource-creation path,
-Copilot surface, notification API, applicant import path, candidate-document
-path, document download/read-body API, model-assessment launcher, queue
-producer, or live Azure smoke. Future slices can wire more contracts into
+and canonical role-source, intake-artifact, and rubric-artifact Blob paths. It
+is **not** a worker, resource-creation path, Copilot surface, notification
+API, applicant import path, candidate-document path, document
+download/read-body API, model-assessment launcher, queue producer, readiness
+unlock path, or live Azure smoke. Future slices can wire more contracts into
 facade routes and workers without rewriting the storage boundary.
 
 ### Azure storage status after E3
@@ -278,7 +288,9 @@ To prevent over-reading: there is no identity seam (auth is a single
 header-parsing function in `api/auth.py`), no case-scoped authorization seam
 (case endpoints still require the global simulated `hr` lab role), no live
 Azure Queue/worker seam (E7 defines Queue message contracts and local/Azure
-adapters only; the case facade does not enqueue), no eval-harness seam
+adapters only; the case facade does not enqueue), no assessment-readiness seam
+(E11 records role/rubric prerequisites but does not unlock assessment), no
+eval-harness seam
 (live-eval stubs skip unconditionally), and no configuration service seam
 (one TOML file read at startup, plus server-side environment guards and the
 Azure Functions wrapper-only storage overlay).

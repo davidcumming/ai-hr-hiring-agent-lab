@@ -19,6 +19,9 @@ CASE_PATHS = {
     "/api/cases/{case_id}/next-actions",
     "/api/cases/{case_id}/source-documents",
     "/api/cases/{case_id}/source-documents/{document_id}",
+    "/api/cases/{case_id}/role-intake",
+    "/api/cases/{case_id}/rubrics",
+    "/api/cases/{case_id}/rubrics/{rubric_version}",
 }
 
 
@@ -247,6 +250,14 @@ def test_e9_case_api_openapi_contract_and_route_non_goals(client):
             "operationId"
         ]
         == "registerSourceDocument"
+    )
+    assert (
+        spec["paths"]["/api/cases/{case_id}/role-intake"]["post"]["operationId"]
+        == "createRoleIntakeArtifact"
+    )
+    assert (
+        spec["paths"]["/api/cases/{case_id}/rubrics"]["post"]["operationId"]
+        == "registerApprovedRubric"
     )
     case_schema = spec["components"]["schemas"]["CaseEnvelope"]
     assert "case_id" in case_schema["properties"]

@@ -470,6 +470,8 @@ class RecruitmentCaseService:
             current_gate=case.current_gate,
             hr_owner_actor_id=case.hr_owner_actor_id,
             primary_hiring_manager_actor_id=case.primary_hiring_manager_actor_id,
+            active_intake_version=case.active_intake_version,
+            active_rubric_version=case.active_rubric_version,
             created_at=case.created_at,
             updated_at=case.updated_at,
             correlation_id=case.correlation_id,

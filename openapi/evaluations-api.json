@@ -1,6 +1,57 @@
 {
   "components": {
     "schemas": {
+      "ApprovedRubricRegisterRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "approved_by_actor_id": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Approved By Actor Id"
+          },
+          "criteria": {
+            "items": {
+              "$ref": "#/components/schemas/RubricCriterionInput"
+            },
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Criteria",
+            "type": "array"
+          },
+          "rubric_title": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Rubric Title",
+            "type": "string"
+          },
+          "rubric_version": {
+            "default": "v1",
+            "pattern": "^v[0-9][A-Za-z0-9._-]{0,31}$",
+            "title": "Rubric Version",
+            "type": "string"
+          },
+          "synthetic": {
+            "title": "Synthetic",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "synthetic",
+          "rubric_title",
+          "criteria"
+        ],
+        "title": "ApprovedRubricRegisterRequest",
+        "type": "object"
+      },
       "CaseEnvelope": {
         "additionalProperties": false,
         "description": "Case-specific standard envelope.\n\nThe existing evaluation ``Envelope`` intentionally remains unchanged so\nthe E9 case surface does not alter the established evaluation API schema.",
@@ -350,6 +401,191 @@
         "title": "RecruitmentCaseCreateRequest",
         "type": "object"
       },
+      "RoleIntakeCreateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "business_context": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Business Context"
+          },
+          "intake_title": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Intake Title",
+            "type": "string"
+          },
+          "intake_version": {
+            "default": "v1",
+            "pattern": "^v[0-9][A-Za-z0-9._-]{0,31}$",
+            "title": "Intake Version",
+            "type": "string"
+          },
+          "open_questions": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Open Questions",
+            "type": "array"
+          },
+          "preferred_qualifications": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Preferred Qualifications",
+            "type": "array"
+          },
+          "required_qualifications": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Required Qualifications",
+            "type": "array"
+          },
+          "responsibilities": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Responsibilities",
+            "type": "array"
+          },
+          "role_purpose": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Role Purpose",
+            "type": "string"
+          },
+          "role_risks": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Role Risks",
+            "type": "array"
+          },
+          "source_document_ids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Source Document Ids",
+            "type": "array"
+          },
+          "synthetic": {
+            "title": "Synthetic",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "synthetic",
+          "intake_title",
+          "role_purpose",
+          "responsibilities",
+          "required_qualifications"
+        ],
+        "title": "RoleIntakeCreateRequest",
+        "type": "object"
+      },
+      "RubricCriterionInput": {
+        "additionalProperties": false,
+        "properties": {
+          "criterion_id": {
+            "maxLength": 80,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._-]+$",
+            "title": "Criterion Id",
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Description",
+            "type": "string"
+          },
+          "evidence_expectations": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Evidence Expectations",
+            "type": "array"
+          },
+          "label": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          },
+          "rating_scale": {
+            "items": {
+              "$ref": "#/components/schemas/RubricRatingAnchorInput"
+            },
+            "maxItems": 10,
+            "minItems": 2,
+            "title": "Rating Scale",
+            "type": "array"
+          },
+          "weight": {
+            "exclusiveMinimum": 0,
+            "maximum": 100,
+            "title": "Weight",
+            "type": "number"
+          }
+        },
+        "required": [
+          "criterion_id",
+          "label",
+          "description",
+          "weight",
+          "rating_scale"
+        ],
+        "title": "RubricCriterionInput",
+        "type": "object"
+      },
+      "RubricRatingAnchorInput": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Description",
+            "type": "string"
+          },
+          "label": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          },
+          "score": {
+            "maximum": 10,
+            "minimum": 0,
+            "title": "Score",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "score",
+          "label",
+          "description"
+        ],
+        "title": "RubricRatingAnchorInput",
+        "type": "object"
+      },
       "SourceDocumentRegisterRequest": {
         "additionalProperties": false,
         "properties": {
@@ -471,7 +707,7 @@
     }
   },
   "info": {
-    "description": "Advisory, evidence-grounded single-candidate evaluation plus the E9 recruitment-case state foundation and E10 source-document registry. Evaluation results are decision support for a human reviewer (decision_support_only=true, human_review_required=true) \u2014 never a hiring decision, ranking, or candidate contact. Case endpoints create and retrieve deterministic workflow state, and source-document endpoints register small synthetic inline role source text through the workflow Table/Blob seam only; they do not import applicants, create candidate packages, start assessment jobs, send notifications, call Foundry/model backends, create queue messages, or change Copilot Studio. Authentication uses SIMULATED lab identity headers (X-Lab-Actor-Id, X-Lab-Roles; the 'hr' role is required); this is a lab stand-in, never an Entra substitute. Envelope status vocabulary: completed | blocked | validation_failed | unauthorized are emitted; needs_input and error are RESERVED. HTTP mapping per the adopted API contracts: business outcomes return 200 with the envelope status; 400 malformed body; 401 missing identity; 403 authenticated without the required role.",
+    "description": "Advisory, evidence-grounded single-candidate evaluation plus the E9 recruitment-case state foundation, E10 source-document registry, and E11 role-intake/rubric foundation. Evaluation results are decision support for a human reviewer (decision_support_only=true, human_review_required=true) \u2014 never a hiring decision, ranking, or candidate contact. Case endpoints create and retrieve deterministic workflow state, source-document endpoints register small synthetic inline role source text, and E11 endpoints version synthetic role-intake and approved rubric artifacts through the workflow Table/Blob seam only; they do not import applicants, create candidate packages, start assessment jobs, send notifications, call Foundry/model backends, create queue messages, unlock assessment, or change Copilot Studio. Authentication uses SIMULATED lab identity headers (X-Lab-Actor-Id, X-Lab-Roles; the 'hr' role is required); this is a lab stand-in, never an Entra substitute. Envelope status vocabulary: completed | blocked | validation_failed | unauthorized are emitted; needs_input and error are RESERVED. HTTP mapping per the adopted API contracts: business outcomes return 200 with the envelope status; 400 malformed body; 401 missing identity; 403 authenticated without the required role.",
     "title": "AI HR Hiring Agent Lab API",
     "version": "1.0.0"
   },
@@ -613,6 +849,276 @@
           }
         },
         "summary": "Retrieve deterministic next actions for one recruitment case"
+      }
+    },
+    "/api/cases/{case_id}/role-intake": {
+      "get": {
+        "description": "Returns the current role-intake artifact and artifact-version metadata for an existing recruitment case. Source-document references are metadata only; raw source text is not read or returned.",
+        "operationId": "getCaseRoleIntake",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional caller-supplied correlation id, echoed on early failures. Completed role-intake and rubric responses return the case correlation id.",
+            "in": "header",
+            "name": "X-Correlation-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Retrieve the current role-intake artifact for a recruitment case"
+      },
+      "post": {
+        "description": "Creates a deterministic synthetic role-intake artifact for an existing case using previously registered source-document metadata. The full artifact is written through the workflow Blob seam; metadata, one artifact-version row, one event, active case version, and existing task/gate updates are written through the workflow Table seam. This endpoint does not call models, enqueue work, import applicants, or change Copilot Studio.",
+        "operationId": "createRoleIntakeArtifact",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional caller-supplied correlation id, echoed on early failures. Completed role-intake and rubric responses return the case correlation id.",
+            "in": "header",
+            "name": "X-Correlation-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleIntakeCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create one synthetic role-intake artifact for a recruitment case"
+      }
+    },
+    "/api/cases/{case_id}/rubrics": {
+      "get": {
+        "description": "Returns persisted rubric artifact-version metadata for one case. The endpoint does not call models, inspect candidate data, or unlock assessment.",
+        "operationId": "listCaseRubrics",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional caller-supplied correlation id, echoed on early failures. Completed role-intake and rubric responses return the case correlation id.",
+            "in": "header",
+            "name": "X-Correlation-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List screening rubric versions for one recruitment case"
+      },
+      "post": {
+        "description": "Registers an already-approved synthetic screening rubric version for an existing case. The endpoint stores the full rubric artifact in Blob, writes ArtifactVersions, Approvals, CaseEvents, active case version, and deterministic gate updates through the workflow Table seam. It does not generate rubrics with a model or unlock assessment.",
+        "operationId": "registerApprovedRubric",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional caller-supplied correlation id, echoed on early failures. Completed role-intake and rubric responses return the case correlation id.",
+            "in": "header",
+            "name": "X-Correlation-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApprovedRubricRegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Register one approved synthetic screening rubric for a case"
+      }
+    },
+    "/api/cases/{case_id}/rubrics/{rubric_version}": {
+      "get": {
+        "description": "Returns one persisted synthetic rubric artifact by version for an existing recruitment case. The endpoint does not read applicant materials, queue assessments, or call a model.",
+        "operationId": "getCaseRubric",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "rubric_version",
+            "required": true,
+            "schema": {
+              "title": "Rubric Version",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional caller-supplied correlation id, echoed on early failures. Completed role-intake and rubric responses return the case correlation id.",
+            "in": "header",
+            "name": "X-Correlation-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Retrieve one approved screening rubric version"
       }
     },
     "/api/cases/{case_id}/source-documents": {

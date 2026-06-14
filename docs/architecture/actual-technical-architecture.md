@@ -33,11 +33,14 @@ Queue-shaped message contracts, a deterministic `LocalWorkflowStore`, and a
 guarded `AzureWorkflowStorageBackend` selected only by explicit
 workflow-storage configuration. The case API uses that seam for creating a
 case, retrieving a case, retrieving deterministic next actions, and
-registering small synthetic role source documents. Source-document intake
-writes raw text through the workflow Blob seam and document metadata/events
-through the workflow Table seam. Queue messages, workers, notifications,
-candidate documents, applicant import, Copilot topics, and live Azure
-resource creation are still not wired by the case API.
+registering small synthetic role source documents, role-intake artifacts, and
+approved synthetic rubric versions. Source-document intake writes raw text
+through the workflow Blob seam and document metadata/events through the
+workflow Table seam. Role-intake and rubric endpoints write full synthetic
+artifacts to Blob and metadata/version/approval/event state to Table-shaped
+rows. Queue messages, workers, notifications, candidate documents, applicant
+import, assessment readiness unlock, Copilot topics, and live Azure resource
+creation are still not wired by the case API.
 
 ```
 CLI (httpx)        any HTTP client
@@ -105,8 +108,8 @@ Copilot Studio manual lab topic
 |---|---|
 | Root `function_app.py` | Azure Functions Python ASGI wrapper around the existing FastAPI app factory. It loads normal config, overrides `persistence.root` to `HRHA_PERSISTENCE_ROOT` or a temp directory, overlays Azure Blob storage app settings only when `HRHA_STORAGE_BACKEND=azure_blob`, and overlays guarded workflow storage only when `HRHA_WORKFLOW_STORAGE_BACKEND=azure`; no routes, business logic, or Foundry behavior are added here. |
 | Root `host.json` / `.funcignore` / `requirements.txt` | Function host route-prefix config, deployment ignore hygiene, and Azure Functions deployment dependencies. |
-| `api/` | App factory, evaluation routes (`POST /api/evaluations` / `submitEvaluation`, `GET /api/evaluations/{evaluation_id}` / `getEvaluation`, `POST /api/evaluations/retrieve` / `retrieveEvaluationForCopilot`), case routes (`POST /api/cases` / `createRecruitmentCase`, `GET /api/cases/{case_id}` / `getRecruitmentCase`, `GET /api/cases/{case_id}/next-actions` / `getCaseNextActions`), source-document routes (`POST /api/cases/{case_id}/source-documents` / `registerSourceDocument`, `GET /api/cases/{case_id}/source-documents` / `listCaseSourceDocuments`, `GET /api/cases/{case_id}/source-documents/{document_id}` / `getCaseSourceDocument`), simulated auth, envelopes, HTTP/error mapping, `Idempotency-Key` header handling for evaluation submit, `X-Correlation-Id` request/response header. |
-| `cases/` | Deterministic recruitment-case and source-document service layer. It depends only on `WorkflowStorageBackend`, creates the initial `RecruitmentCases`, `CaseParticipants`, `CaseTasks`, `WorkflowGates`, and `CaseEvents` rows, registers `SourceDocuments`, writes role source text to canonical workflow Blob paths, and builds read-only case/next-action/source-document snapshots. It does not import `LocalWorkflowStore`, `AzureWorkflowStorageBackend`, Azure SDKs, providers, queues, applicant/candidate package code, or Copilot tooling. |
+| `api/` | App factory, evaluation routes (`POST /api/evaluations` / `submitEvaluation`, `GET /api/evaluations/{evaluation_id}` / `getEvaluation`, `POST /api/evaluations/retrieve` / `retrieveEvaluationForCopilot`), case routes (`POST /api/cases` / `createRecruitmentCase`, `GET /api/cases/{case_id}` / `getRecruitmentCase`, `GET /api/cases/{case_id}/next-actions` / `getCaseNextActions`), source-document routes (`POST /api/cases/{case_id}/source-documents` / `registerSourceDocument`, `GET /api/cases/{case_id}/source-documents` / `listCaseSourceDocuments`, `GET /api/cases/{case_id}/source-documents/{document_id}` / `getCaseSourceDocument`), role-intake routes (`POST/GET /api/cases/{case_id}/role-intake`), approved-rubric routes (`POST/GET /api/cases/{case_id}/rubrics`, `GET /api/cases/{case_id}/rubrics/{rubric_version}`), simulated auth, envelopes, HTTP/error mapping, `Idempotency-Key` header handling for evaluation submit, `X-Correlation-Id` request/response header. |
+| `cases/` | Deterministic recruitment-case, source-document, role-intake, and approved-rubric service layer. It depends only on `WorkflowStorageBackend`, creates the initial `RecruitmentCases`, `CaseParticipants`, `CaseTasks`, `WorkflowGates`, and `CaseEvents` rows, registers `SourceDocuments`, writes role source text to canonical workflow Blob paths, writes role-intake/rubric artifacts to canonical Blob paths, writes `ArtifactVersions`/`Approvals`/events, and builds read-only case/next-action/artifact snapshots. It does not import `LocalWorkflowStore`, `AzureWorkflowStorageBackend`, Azure SDKs, providers, queues, applicant/candidate package code, or Copilot tooling. |
 | `cli.py` | Thin HTTP client (stdlib + httpx only — no application imports). |
 | `config.py` | Typed, validated view of `config/lab-config.toml` (pydantic, `extra="forbid"`); provider-ID/backend-family consistency validation; evaluation and workflow storage backend selection; Foundry/provider env guard readers (`HRHA_ENABLE_LIVE_AZURE`, `HRHA_PROVIDER_KILL_SWITCH`) plus storage-specific guards (`HRHA_ENABLE_AZURE_STORAGE`, `HRHA_ENABLE_AZURE_WORKFLOW_STORAGE`); `tomllib` with `tomli` fallback on Python 3.10. |
 | `council/` | 11-role registry and Mode A/B/C tables, synchronous orchestrator, deterministic code roles. |
@@ -159,25 +162,32 @@ Copilot Studio manual lab topic
    E7/E8 contracts define the MVP case/workflow entity model, exact Blob
    paths, and async work request messages. The case facade uses
    `WorkflowStorageBackend` to create and retrieve initial case state and to
-   register small synthetic role source documents. Source-document intake
-   writes one canonical `role-source/{document_id}/raw` Blob artifact plus
+   register small synthetic role source documents, role-intake artifacts, and
+   approved synthetic rubric versions. Source-document intake writes one
+   canonical `role-source/{document_id}/raw` Blob artifact plus
    `SourceDocuments` and `CaseEvents` rows, and deterministically satisfies
-   the existing source-document task/gate when present. The local adapter
-   remains deterministic; the Azure adapter maps the same contracts to guarded
-   Table/Blob/Queue SDK clients. No worker, notification path, applicant
-   import, candidate document upload, queue write, or derived artifact version
-   uses them yet.
+   the existing source-document task/gate when present. Role intake writes an
+   approved `role_intake` `ArtifactVersions` row and an intake Blob artifact;
+   rubric registration writes an approved `screening_rubric` artifact row, one
+   `Approvals` row, and a rubric Blob artifact. Existing tasks/gates are
+   updated when present; missing task/gate rows are not fabricated. The local
+   adapter remains deterministic; the Azure adapter maps the same contracts to
+   guarded Table/Blob/Queue SDK clients. No worker, notification path,
+   applicant import, candidate document upload, queue write, model call, or
+   assessment readiness unlock uses them yet.
 
 ## 4. Contracts and versioning
 
 - **OpenAPI**: `openapi/evaluations-api.json`, generated from the app factory
   by `scripts/export_openapi.py`; `--check` exits non-zero on drift
-  (verified clean 2026-06-13; also a CI step and a test). Stable evaluation
+  (verified clean 2026-06-14; also a CI step and a test). Stable evaluation
   operation IDs `submitEvaluation`, `getEvaluation`, and
   `retrieveEvaluationForCopilot`; stable case operation IDs
   `createRecruitmentCase`, `getRecruitmentCase`, `getCaseNextActions`,
-  `registerSourceDocument`, `listCaseSourceDocuments`, and
-  `getCaseSourceDocument`.
+  `registerSourceDocument`, `listCaseSourceDocuments`,
+  `getCaseSourceDocument`, `createRoleIntakeArtifact`,
+  `getCaseRoleIntake`, `registerApprovedRubric`, `listCaseRubrics`, and
+  `getCaseRubric`.
   Evaluation submit documents `Idempotency-Key`; all tool-facing routes
   document `X-Correlation-Id`. Request schemas expose no
   provider/model/deployment/endpoint/agent field (test-pinned).
@@ -187,9 +197,9 @@ Copilot Studio manual lab topic
   is a Swagger 2.0 custom-connector artifact separate from the OpenAPI 3.1
   source contract. It exposes exactly three Copilot-facing actions:
   `submitEvaluation`, `getEvaluation`, and
-  `retrieveEvaluationForCopilot`. It intentionally exposes no case or
-  source-document actions. The retrieve wrapper accepts only body field
-  `evaluation_id`; the canonical GET route remains available.
+  `retrieveEvaluationForCopilot`. It intentionally exposes no case,
+  source-document, role-intake, or rubric actions. The retrieve wrapper accepts
+  only body field `evaluation_id`; the canonical GET route remains available.
 - **Provider contract**: single schema source for all backends
   (`domain/schemas/provider.py`): `PROVIDER_CONTRACT_VERSION = "1.0"`,
   `ORCHESTRATION_VERSION = "council-composition-v1"`; nullable
@@ -211,10 +221,12 @@ Copilot Studio manual lab topic
   (`domain/schemas/workflow_queue.py`); workflow storage protocols
   (`persistence/workflow_storage.py`). Case API schemas in
   `domain/schemas/cases.py` cover case create/read/next-action envelopes and
-  the strict source-document registration request/summary shapes. The case
-  facade uses the Table portion of the workflow contracts for case state and
-  uses the Blob portion only for raw role source documents. The Copilot Swagger
-  contract remains unchanged and evaluation-only.
+  the strict source-document, role-intake, and approved-rubric request/summary
+  shapes. The case facade uses the Table portion of the workflow contracts for
+  case state, source-document metadata, artifact versions, rubric approvals,
+  and events; it uses the Blob portion for raw role source documents and
+  synthetic role-intake/rubric artifacts. The Copilot Swagger contract remains
+  unchanged and evaluation-only.
 
 ## 5. Persistence design (local, storage-shape-mirrored)
 
@@ -283,8 +295,15 @@ foundation for case/workflow facade slices. The case facade uses it through
 `CaseParticipants`, `CaseTasks`, `WorkflowGates`, and `CaseEvents` rows, and
 to register role source documents as `SourceDocuments` rows plus Blob files
 under `case-documents/cases/{case_id}/role-source/{document_id}/raw`.
-Document registration does not write `ArtifactVersions`, normalized text,
-candidate documents, workflow Queue messages, or applicant records.
+The facade also writes role-intake artifacts under
+`case-artifacts/cases/{case_id}/intake/{version}/intake.json` and rubric
+artifacts under `case-artifacts/cases/{case_id}/rubric/{version}/rubric.json`,
+with Table metadata in `ArtifactVersions`, a rubric `Approvals` row, and
+business events. Document registration does not write `ArtifactVersions`,
+normalized text, candidate documents, workflow Queue messages, or applicant
+records. Role-intake/rubric registration does not create queue messages,
+candidate packages, applicants, assessments, notifications, or readiness
+unlock state.
 
 `AzureWorkflowStorageBackend` is available only when `[workflow_storage]
 backend = "azure"` is explicitly selected and
@@ -387,12 +406,14 @@ nothing below should be read as implemented:
   and reconciliation remain local/deferred.
 - **No complete case-management or notification API** — the case facade
   supports only `POST /api/cases`, `GET /api/cases/{case_id}`,
-  `GET /api/cases/{case_id}/next-actions`, and the narrow source-document
-  metadata routes under `/api/cases/{case_id}/source-documents`. There is no
-  case search, body-based Copilot case retrieve wrapper, notification
-  endpoint, applicant endpoint, assessment-status endpoint, worker,
-  candidate-document route, document download/read-body route, normalized-text
-  extraction, or Copilot topic wiring for those contracts.
+  `GET /api/cases/{case_id}/next-actions`, the narrow source-document metadata
+  routes under `/api/cases/{case_id}/source-documents`, `POST/GET
+  /api/cases/{case_id}/role-intake`, and `POST/GET
+  /api/cases/{case_id}/rubrics` plus versioned rubric GET. There is no case
+  search, body-based Copilot case retrieve wrapper, notification endpoint,
+  applicant endpoint, assessment-status endpoint, worker, candidate-document
+  route, document download/read-body route, normalized-text extraction,
+  readiness-check/unlock route, or Copilot topic wiring for those contracts.
 - **No prompt execution** — prompt templates are recorded provenance only;
   no prompt text is ever sent to any model.
 - **No source-controlled or production Copilot Studio integration** — one

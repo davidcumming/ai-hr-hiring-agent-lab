@@ -29,6 +29,9 @@ CASE_PATHS = {
     "/api/cases/{case_id}/next-actions",
     "/api/cases/{case_id}/source-documents",
     "/api/cases/{case_id}/source-documents/{document_id}",
+    "/api/cases/{case_id}/role-intake",
+    "/api/cases/{case_id}/rubrics",
+    "/api/cases/{case_id}/rubrics/{rubric_version}",
 }
 
 

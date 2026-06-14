@@ -11,6 +11,7 @@ from hr_eval_lab.domain.schemas.workflow_artifacts import (
     final_evaluation_report_path,
     human_review_path,
     model_assessment_record_path,
+    role_intake_artifact_path,
     role_source_raw_path,
     rubric_artifact_path,
     validate_blob_path,
@@ -29,6 +30,10 @@ def test_e7_blob_path_builders_return_exact_contract_paths():
     assert (
         rubric_artifact_path("case-001", "v1")
         == "case-artifacts/cases/case-001/rubric/v1/rubric.json"
+    )
+    assert (
+        role_intake_artifact_path("case-001", "v1")
+        == "case-artifacts/cases/case-001/intake/v1/intake.json"
     )
     assert (
         candidate_package_path("case-001", "cand-001", "v1")

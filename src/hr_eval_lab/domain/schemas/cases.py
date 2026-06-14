@@ -1,4 +1,4 @@
-"""Recruitment case API schemas for the E9 case-state foundation."""
+"""Recruitment case API schemas for the case workflow facade."""
 
 from __future__ import annotations
 
@@ -47,6 +47,21 @@ SourceDocumentRequestOrigin = Literal[
     "external_reference",
 ]
 SourceDocumentMimeType = Literal["text/plain", "text/markdown"]
+WorkflowArtifactStatus = Literal[
+    "draft",
+    "under_review",
+    "approved",
+    "superseded",
+    "rejected",
+    "exported",
+]
+
+
+def _strip_string_list(values: list[str], label: str) -> list[str]:
+    stripped = [_strip_required(value, label) for value in values]
+    if len(set(stripped)) != len(stripped):
+        raise ValueError(f"{label} must not contain duplicates")
+    return stripped
 
 
 class HiringManagerInput(BaseModel):
@@ -111,6 +126,121 @@ class SourceDocumentRegisterRequest(BaseModel):
         return value
 
 
+class RoleIntakeCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    synthetic: bool
+    intake_title: str = Field(min_length=1, max_length=160)
+    role_purpose: str = Field(min_length=1, max_length=2_000)
+    responsibilities: list[str] = Field(min_length=1, max_length=20)
+    required_qualifications: list[str] = Field(min_length=1, max_length=20)
+    intake_version: str = Field(default="v1", pattern=r"^v[0-9][A-Za-z0-9._-]{0,31}$")
+    preferred_qualifications: list[str] = Field(default_factory=list, max_length=20)
+    business_context: str | None = Field(default=None, max_length=2_000)
+    role_risks: list[str] = Field(default_factory=list, max_length=20)
+    open_questions: list[str] = Field(default_factory=list, max_length=20)
+    source_document_ids: list[str] = Field(default_factory=list, max_length=20)
+
+    @field_validator(
+        "intake_title",
+        "role_purpose",
+        "business_context",
+        "intake_version",
+    )
+    @classmethod
+    def _strip_strings(cls, value: str | None, info) -> str | None:
+        if value is None:
+            return None
+        return _strip_required(value, info.field_name)
+
+    @field_validator(
+        "responsibilities",
+        "required_qualifications",
+        "preferred_qualifications",
+        "role_risks",
+        "open_questions",
+        "source_document_ids",
+    )
+    @classmethod
+    def _strip_lists(cls, value: list[str], info) -> list[str]:
+        return _strip_string_list(value, info.field_name)
+
+    @field_validator("synthetic")
+    @classmethod
+    def _require_synthetic_true(cls, value: bool) -> bool:
+        if value is not True:
+            raise ValueError("synthetic must be true")
+        return value
+
+
+class RubricRatingAnchorInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    score: int = Field(ge=0, le=10)
+    label: str = Field(min_length=1, max_length=80)
+    description: str = Field(min_length=1, max_length=500)
+
+    @field_validator("label", "description")
+    @classmethod
+    def _strip_strings(cls, value: str, info) -> str:
+        return _strip_required(value, info.field_name)
+
+
+class RubricCriterionInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    criterion_id: str = Field(min_length=1, max_length=80, pattern=r"^[A-Za-z0-9._-]+$")
+    label: str = Field(min_length=1, max_length=120)
+    description: str = Field(min_length=1, max_length=1_000)
+    weight: float = Field(gt=0, le=100)
+    rating_scale: list[RubricRatingAnchorInput] = Field(min_length=2, max_length=10)
+    evidence_expectations: list[str] = Field(default_factory=list, max_length=20)
+
+    @field_validator("criterion_id", "label", "description")
+    @classmethod
+    def _strip_strings(cls, value: str, info) -> str:
+        return _strip_required(value, info.field_name)
+
+    @field_validator("evidence_expectations")
+    @classmethod
+    def _strip_lists(cls, value: list[str], info) -> list[str]:
+        return _strip_string_list(value, info.field_name)
+
+
+class ApprovedRubricRegisterRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    synthetic: bool
+    rubric_title: str = Field(min_length=1, max_length=160)
+    criteria: list[RubricCriterionInput] = Field(min_length=1, max_length=10)
+    rubric_version: str = Field(default="v1", pattern=r"^v[0-9][A-Za-z0-9._-]{0,31}$")
+    approved_by_actor_id: str | None = Field(default=None, min_length=1, max_length=120)
+
+    @field_validator("rubric_title", "rubric_version", "approved_by_actor_id")
+    @classmethod
+    def _strip_strings(cls, value: str | None, info) -> str | None:
+        if value is None:
+            return None
+        return _strip_required(value, info.field_name)
+
+    @field_validator("criteria")
+    @classmethod
+    def _require_unique_criteria(
+        cls, value: list[RubricCriterionInput]
+    ) -> list[RubricCriterionInput]:
+        criterion_ids = [criterion.criterion_id for criterion in value]
+        if len(set(criterion_ids)) != len(criterion_ids):
+            raise ValueError("criteria must have unique criterion_id values")
+        return value
+
+    @field_validator("synthetic")
+    @classmethod
+    def _require_synthetic_true(cls, value: bool) -> bool:
+        if value is not True:
+            raise ValueError("synthetic must be true")
+        return value
+
+
 class CaseSummary(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -124,6 +254,8 @@ class CaseSummary(BaseModel):
     current_gate: str
     hr_owner_actor_id: str
     primary_hiring_manager_actor_id: str | None = None
+    active_intake_version: str | None = None
+    active_rubric_version: str | None = None
     created_at: str
     updated_at: str | None = None
     correlation_id: str
@@ -203,6 +335,61 @@ class SourceDocumentSummary(BaseModel):
     version: str
     created_at: str
     synthetic: bool = True
+
+
+class WorkflowArtifactSummary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    artifact_id: str
+    artifact_type: str
+    version: str
+    status: WorkflowArtifactStatus
+    blob_path: str
+    sha256: str
+    source_document_ids: list[str] = Field(default_factory=list)
+    created_at: str
+    synthetic: bool = True
+
+
+class RoleIntakeArtifactResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    case: CaseSummary
+    artifact: WorkflowArtifactSummary
+    role_intake: dict[str, Any]
+
+
+class RoleIntakeGetResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    case_id: str
+    artifact: WorkflowArtifactSummary
+    role_intake: dict[str, Any]
+
+
+class RubricArtifactResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    case: CaseSummary
+    artifact: WorkflowArtifactSummary
+    approval_id: str
+    rubric: dict[str, Any]
+
+
+class RubricListResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    case_id: str
+    active_rubric_version: str | None = None
+    rubrics: list[WorkflowArtifactSummary] = Field(default_factory=list)
+
+
+class RubricGetResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    case_id: str
+    artifact: WorkflowArtifactSummary
+    rubric: dict[str, Any]
 
 
 class RecruitmentCaseResult(BaseModel):

@@ -89,6 +89,17 @@ def rubric_artifact_path(case_id: str, version: str) -> str:
     )
 
 
+def role_intake_artifact_path(case_id: str, version: str) -> str:
+    return _join(
+        "case-artifacts",
+        "cases",
+        _safe_segment(case_id, "case_id"),
+        "intake",
+        _safe_segment(version, "version"),
+        "intake.json",
+    )
+
+
 def candidate_package_path(case_id: str, candidate_id: str, version: str) -> str:
     return _join(
         "case-artifacts",

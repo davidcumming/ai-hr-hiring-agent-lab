@@ -49,6 +49,9 @@ def test_routes_and_status_vocabulary_conform():
         "/api/cases",
         "/api/cases/{case_id}",
         "/api/cases/{case_id}/next-actions",
+        "/api/cases/{case_id}/role-intake",
+        "/api/cases/{case_id}/rubrics",
+        "/api/cases/{case_id}/rubrics/{rubric_version}",
         "/api/cases/{case_id}/source-documents",
         "/api/cases/{case_id}/source-documents/{document_id}",
         "/api/evaluations",
@@ -58,6 +61,11 @@ def test_routes_and_status_vocabulary_conform():
     assert "post" in paths["/api/cases"]
     assert "get" in paths["/api/cases/{case_id}"]
     assert "get" in paths["/api/cases/{case_id}/next-actions"]
+    assert "post" in paths["/api/cases/{case_id}/role-intake"]
+    assert "get" in paths["/api/cases/{case_id}/role-intake"]
+    assert "post" in paths["/api/cases/{case_id}/rubrics"]
+    assert "get" in paths["/api/cases/{case_id}/rubrics"]
+    assert "get" in paths["/api/cases/{case_id}/rubrics/{rubric_version}"]
     assert "post" in paths["/api/cases/{case_id}/source-documents"]
     assert "get" in paths["/api/cases/{case_id}/source-documents"]
     assert "get" in paths["/api/cases/{case_id}/source-documents/{document_id}"]
@@ -69,6 +77,28 @@ def test_routes_and_status_vocabulary_conform():
     assert (
         paths["/api/cases/{case_id}/next-actions"]["get"]["operationId"]
         == "getCaseNextActions"
+    )
+    assert (
+        paths["/api/cases/{case_id}/role-intake"]["post"]["operationId"]
+        == "createRoleIntakeArtifact"
+    )
+    assert (
+        paths["/api/cases/{case_id}/role-intake"]["get"]["operationId"]
+        == "getCaseRoleIntake"
+    )
+    assert (
+        paths["/api/cases/{case_id}/rubrics"]["post"]["operationId"]
+        == "registerApprovedRubric"
+    )
+    assert (
+        paths["/api/cases/{case_id}/rubrics"]["get"]["operationId"]
+        == "listCaseRubrics"
+    )
+    assert (
+        paths["/api/cases/{case_id}/rubrics/{rubric_version}"]["get"][
+            "operationId"
+        ]
+        == "getCaseRubric"
     )
     assert (
         paths["/api/cases/{case_id}/source-documents"]["post"]["operationId"]
@@ -130,6 +160,10 @@ def test_routes_and_status_vocabulary_conform():
     assert "RecruitmentCaseCreateRequest" in components
     assert "HiringManagerInput" in components
     assert "SourceDocumentRegisterRequest" in components
+    assert "RoleIntakeCreateRequest" in components
+    assert "ApprovedRubricRegisterRequest" in components
+    assert "RubricCriterionInput" in components
+    assert "RubricRatingAnchorInput" in components
     create_case_component = components["RecruitmentCaseCreateRequest"]
     assert "$defs" not in create_case_component
     assert {
@@ -175,4 +209,64 @@ def test_routes_and_status_vocabulary_conform():
         "source_origin",
         "synthetic",
         "content_text",
+    ]
+
+    role_intake_request_body = paths["/api/cases/{case_id}/role-intake"]["post"][
+        "requestBody"
+    ]
+    role_intake_schema = role_intake_request_body["content"]["application/json"][
+        "schema"
+    ]
+    assert role_intake_schema == {
+        "$ref": "#/components/schemas/RoleIntakeCreateRequest"
+    }
+    assert "$defs" not in role_intake_schema
+    assert "#/$defs/" not in json.dumps(role_intake_request_body)
+
+    role_intake_component = components["RoleIntakeCreateRequest"]
+    assert "$defs" not in role_intake_component
+    assert {
+        "synthetic",
+        "intake_title",
+        "role_purpose",
+        "responsibilities",
+        "required_qualifications",
+        "intake_version",
+        "preferred_qualifications",
+        "business_context",
+        "role_risks",
+        "open_questions",
+        "source_document_ids",
+    } == set(role_intake_component["properties"])
+    assert role_intake_component["required"] == [
+        "synthetic",
+        "intake_title",
+        "role_purpose",
+        "responsibilities",
+        "required_qualifications",
+    ]
+
+    rubric_request_body = paths["/api/cases/{case_id}/rubrics"]["post"][
+        "requestBody"
+    ]
+    rubric_schema = rubric_request_body["content"]["application/json"]["schema"]
+    assert rubric_schema == {
+        "$ref": "#/components/schemas/ApprovedRubricRegisterRequest"
+    }
+    assert "$defs" not in rubric_schema
+    assert "#/$defs/" not in json.dumps(rubric_request_body)
+
+    rubric_component = components["ApprovedRubricRegisterRequest"]
+    assert "$defs" not in rubric_component
+    assert {
+        "synthetic",
+        "rubric_title",
+        "criteria",
+        "rubric_version",
+        "approved_by_actor_id",
+    } == set(rubric_component["properties"])
+    assert rubric_component["required"] == [
+        "synthetic",
+        "rubric_title",
+        "criteria",
     ]

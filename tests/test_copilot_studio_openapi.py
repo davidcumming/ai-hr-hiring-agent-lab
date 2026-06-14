@@ -129,7 +129,12 @@ def test_only_three_intended_actions_are_exposed():
     )
     serialized_paths = json.dumps(spec["paths"])
     assert "/api/cases" not in serialized_paths
+    assert "role-intake" not in serialized_paths
+    assert "rubrics" not in serialized_paths
     assert "source-documents" not in serialized_paths
+    assert "applicants" not in serialized_paths
+    assert "candidates" not in serialized_paths
+    assert "assessments" not in serialized_paths
 
 
 def test_host_basepath_and_scheme_are_environment_neutral():
