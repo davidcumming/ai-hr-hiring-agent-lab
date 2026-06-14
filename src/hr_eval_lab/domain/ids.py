@@ -22,6 +22,10 @@ def new_event_id() -> str:
     return "evt-" + uuid.uuid4().hex[:20]
 
 
+def new_document_id() -> str:
+    return "doc-" + uuid.uuid4().hex[:20]
+
+
 def correlation_id_for(evaluation_id: str) -> str:
     """Correlation id is derived from the evaluation id so that normalizing
     the evaluation id in determinism tests normalizes correlation too."""

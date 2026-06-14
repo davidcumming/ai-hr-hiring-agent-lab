@@ -17,6 +17,8 @@ CASE_PATHS = {
     "/api/cases",
     "/api/cases/{case_id}",
     "/api/cases/{case_id}/next-actions",
+    "/api/cases/{case_id}/source-documents",
+    "/api/cases/{case_id}/source-documents/{document_id}",
 }
 
 
@@ -240,6 +242,12 @@ def test_e9_case_api_openapi_contract_and_route_non_goals(client):
         spec["paths"]["/api/cases/{case_id}/next-actions"]["get"]["operationId"]
         == "getCaseNextActions"
     )
+    assert (
+        spec["paths"]["/api/cases/{case_id}/source-documents"]["post"][
+            "operationId"
+        ]
+        == "registerSourceDocument"
+    )
     case_schema = spec["components"]["schemas"]["CaseEnvelope"]
     assert "case_id" in case_schema["properties"]
     assert "next_actions" in case_schema["properties"]
@@ -247,7 +255,6 @@ def test_e9_case_api_openapi_contract_and_route_non_goals(client):
     serialized_paths = json.dumps(sorted(paths))
     for deferred in (
         "notifications",
-        "documents",
         "applicants",
         "assessments",
         "human-reviews",

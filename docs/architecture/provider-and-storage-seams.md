@@ -165,9 +165,12 @@ implementation would map the idempotency table to Azure Table directly).
 
 E7 adds workflow storage contracts beside the existing evaluation persistence
 seam. E8 adds guarded Azure SDK-backed adapters behind those contracts while
-preserving the local deterministic default. E9 uses the Table portion of this
-seam for the first public recruitment-case endpoints: `POST /api/cases`,
-`GET /api/cases/{case_id}`, and `GET /api/cases/{case_id}/next-actions`.
+preserving the local deterministic default. The public case facade uses this
+seam for the first recruitment-case endpoints: `POST /api/cases`,
+`GET /api/cases/{case_id}`, `GET /api/cases/{case_id}/next-actions`,
+`POST /api/cases/{case_id}/source-documents`,
+`GET /api/cases/{case_id}/source-documents`, and
+`GET /api/cases/{case_id}/source-documents/{document_id}`.
 
 - `domain/schemas/workflow.py` defines 18 Table-shaped MVP workflow entities
   (`RecruitmentCases`, `CaseParticipants`, `CaseTasks`, `CaseEvents`,
@@ -192,10 +195,14 @@ seam for the first public recruitment-case endpoints: `POST /api/cases`,
   `WorkflowTableStore`, `WorkflowBlobStore`, `WorkflowQueueStore`, and the
   composed `WorkflowStorageBackend`. `select_workflow_storage()` resolves the
   backend lazily from `[workflow_storage]`.
-- `cases/service.py` depends only on `WorkflowStorageBackend`. It creates and
-  reads `RecruitmentCases`, `CaseParticipants`, `CaseTasks`, `WorkflowGates`,
-  and `CaseEvents` rows for E9. It does not import concrete local/Azure
-  adapters, Azure SDKs, provider code, Blob path writers, Queue writers, or
+- `cases/service.py` and `cases/source_documents.py` depend only on
+  `WorkflowStorageBackend`. The case service creates and reads
+  `RecruitmentCases`, `CaseParticipants`, `CaseTasks`, `WorkflowGates`, and
+  `CaseEvents` rows. The source-document service writes small synthetic role
+  source text through the canonical `role_source_raw_path()` Blob path, then
+  writes `SourceDocuments` and `CaseEvents` rows and deterministic task/gate
+  updates. These services do not import concrete local/Azure adapters, Azure
+  SDKs, provider code, Queue writers, applicant/candidate package code, or
   Copilot tooling.
 - `LocalWorkflowStore` persists these shapes under `<root>/workflow/` using
   JSONL Table rows, local files for Blob artifacts, and JSONL Queue messages.
@@ -208,11 +215,12 @@ seam for the first public recruitment-case endpoints: `POST /api/cases`,
   Azure SDKs only inside the real-client builder after configuration guards
   pass; deterministic tests inject fake clients.
 
-E9 is a narrow public API use of the Table contracts only. It is **not** a
-worker, resource-creation path, Copilot surface, notification API, document
-API, applicant import path, model-assessment launcher, or live Azure smoke.
-Future slices can wire more contracts into facade routes and workers without
-rewriting the storage boundary.
+The case facade is a narrow public API use of the workflow Table contracts
+and one role-source Blob path. It is **not** a worker, resource-creation path,
+Copilot surface, notification API, applicant import path, candidate-document
+path, document download/read-body API, model-assessment launcher, queue
+producer, or live Azure smoke. Future slices can wire more contracts into
+facade routes and workers without rewriting the storage boundary.
 
 ### Azure storage status after E3
 
@@ -268,12 +276,12 @@ role-to-future-agent mapping sample (placeholders only) is committed at
 
 To prevent over-reading: there is no identity seam (auth is a single
 header-parsing function in `api/auth.py`), no case-scoped authorization seam
-(E9 case endpoints still require the global simulated `hr` lab role), no live
+(case endpoints still require the global simulated `hr` lab role), no live
 Azure Queue/worker seam (E7 defines Queue message contracts and local/Azure
-adapters only; E9 does not enqueue), no eval-harness seam (live-eval stubs
-skip unconditionally), and no configuration service seam (one TOML file read
-at startup, plus server-side environment guards and the Azure Functions
-wrapper-only storage overlay).
+adapters only; the case facade does not enqueue), no eval-harness seam
+(live-eval stubs skip unconditionally), and no configuration service seam
+(one TOML file read at startup, plus server-side environment guards and the
+Azure Functions wrapper-only storage overlay).
 
 ## 5. Live-wiring gates (status, not architecture)
 

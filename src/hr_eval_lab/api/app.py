@@ -25,10 +25,12 @@ from hr_eval_lab.api.errors import (
 )
 from hr_eval_lab.api.routes_cases import router as cases_router
 from hr_eval_lab.api.routes_evaluations import router as evaluations_router
+from hr_eval_lab.api.routes_source_documents import router as source_documents_router
 from hr_eval_lab.config import LabConfig, load_config
 from hr_eval_lab.domain.schemas.cases import (
     HiringManagerInput,
     RecruitmentCaseCreateRequest,
+    SourceDocumentRegisterRequest,
 )
 from hr_eval_lab.logging_setup import get_logger
 from hr_eval_lab.persistence.backend import select_backend
@@ -41,13 +43,16 @@ OPENAPI_TITLE = "AI HR Hiring Agent Lab API"
 OPENAPI_VERSION = "1.0.0"
 OPENAPI_DESCRIPTION = (
     "Advisory, evidence-grounded single-candidate evaluation plus the E9 "
-    "recruitment-case state foundation. Evaluation results are decision "
+    "recruitment-case state foundation and E10 source-document registry. "
+    "Evaluation results are decision "
     "support for a human reviewer (decision_support_only=true, "
     "human_review_required=true) — never a hiring decision, ranking, or "
     "candidate contact. Case endpoints create and retrieve deterministic "
-    "workflow state only; they do not import applicants, upload documents, "
-    "start assessment jobs, send notifications, call Foundry/model backends, "
-    "or change Copilot Studio. Authentication uses SIMULATED lab identity "
+    "workflow state, and source-document endpoints register small synthetic "
+    "inline role source text through the workflow Table/Blob seam only; they "
+    "do not import applicants, create candidate packages, start assessment "
+    "jobs, send notifications, call Foundry/model backends, create queue "
+    "messages, or change Copilot Studio. Authentication uses SIMULATED lab identity "
     "headers (X-Lab-Actor-Id, X-Lab-Roles; the 'hr' role is required); this "
     "is a lab stand-in, never an Entra substitute. Envelope status vocabulary: "
     "completed | blocked | validation_failed | unauthorized are emitted; "
@@ -63,6 +68,7 @@ def _case_request_component_schemas() -> dict[str, Any]:
         [
             (RecruitmentCaseCreateRequest, "validation"),
             (HiringManagerInput, "validation"),
+            (SourceDocumentRegisterRequest, "validation"),
         ],
         ref_template="#/components/schemas/{model}",
     )
@@ -133,6 +139,7 @@ def create_app(
 
     app.include_router(evaluations_router)
     app.include_router(cases_router)
+    app.include_router(source_documents_router)
     _install_case_openapi_components(app)
 
     logger = get_logger("app")

@@ -351,6 +351,7 @@ class SourceDocument(CasePartitionedWorkflowEntity):
     document_id: str
     candidate_id: str | None = None
     document_type: str
+    source_label: str | None = None
     source_origin: Literal[
         "manual_upload",
         "fixture",

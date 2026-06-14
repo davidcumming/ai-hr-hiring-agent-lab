@@ -10,6 +10,7 @@ from hr_eval_lab.domain.schemas.workflow import (
     CaseRole,
     CaseStatus,
     GateStatus,
+    SourceDocumentStatus,
     TaskStatus,
 )
 
@@ -29,6 +30,23 @@ def _strip_required(value: str, label: str) -> str:
     if not text:
         raise ValueError(f"{label} must not be empty")
     return text
+
+
+SourceDocumentRequestType = Literal[
+    "job_description",
+    "adp_export",
+    "posting_source",
+    "org_context",
+    "business_note",
+    "other_role_source",
+]
+SourceDocumentRequestOrigin = Literal[
+    "manual_upload",
+    "fixture",
+    "adp_export",
+    "external_reference",
+]
+SourceDocumentMimeType = Literal["text/plain", "text/markdown"]
 
 
 class HiringManagerInput(BaseModel):
@@ -65,6 +83,32 @@ class RecruitmentCaseCreateRequest(BaseModel):
     @property
     def resolved_case_title(self) -> str:
         return self.case_title or f"{self.role_title} - {self.department}"
+
+
+class SourceDocumentRegisterRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    document_type: SourceDocumentRequestType
+    source_origin: SourceDocumentRequestOrigin
+    source_label: str | None = None
+    file_name: str | None = None
+    mime_type: SourceDocumentMimeType = "text/plain"
+    synthetic: bool
+    content_text: str = Field(min_length=1, max_length=20_000)
+
+    @field_validator("source_label", "file_name", "content_text")
+    @classmethod
+    def _strip_strings(cls, value: str | None, info) -> str | None:
+        if value is None:
+            return None
+        return _strip_required(value, info.field_name)
+
+    @field_validator("synthetic")
+    @classmethod
+    def _require_synthetic_true(cls, value: bool) -> bool:
+        if value is not True:
+            raise ValueError("synthetic must be true")
+        return value
 
 
 class CaseSummary(BaseModel):
@@ -143,6 +187,24 @@ class CaseNextAction(BaseModel):
     blocker_ids: list[str] = Field(default_factory=list)
 
 
+class SourceDocumentSummary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    document_id: str
+    document_type: str
+    source_origin: str
+    source_label: str | None = None
+    blob_path: str
+    mime_type: str | None = None
+    file_name: str | None = None
+    size_bytes: int
+    sha256: str
+    processing_status: SourceDocumentStatus
+    version: str
+    created_at: str
+    synthetic: bool = True
+
+
 class RecruitmentCaseResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -162,6 +224,28 @@ class CaseNextActionsResult(BaseModel):
     blocked_tasks: list[CaseTaskSummary] = Field(default_factory=list)
     active_gate_blockers: list[WorkflowGateSummary] = Field(default_factory=list)
     next_actions: list[CaseNextAction] = Field(default_factory=list)
+
+
+class SourceDocumentRegistrationResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    case: CaseSummary
+    document: SourceDocumentSummary
+    documents_count: int
+
+
+class SourceDocumentListResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    case_id: str
+    documents: list[SourceDocumentSummary] = Field(default_factory=list)
+
+
+class SourceDocumentGetResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    case_id: str
+    document: SourceDocumentSummary
 
 
 class CaseEnvelope(BaseModel):

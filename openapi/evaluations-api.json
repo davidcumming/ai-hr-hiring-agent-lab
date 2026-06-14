@@ -350,6 +350,84 @@
         "title": "RecruitmentCaseCreateRequest",
         "type": "object"
       },
+      "SourceDocumentRegisterRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "content_text": {
+            "maxLength": 20000,
+            "minLength": 1,
+            "title": "Content Text",
+            "type": "string"
+          },
+          "document_type": {
+            "enum": [
+              "job_description",
+              "adp_export",
+              "posting_source",
+              "org_context",
+              "business_note",
+              "other_role_source"
+            ],
+            "title": "Document Type",
+            "type": "string"
+          },
+          "file_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "File Name"
+          },
+          "mime_type": {
+            "default": "text/plain",
+            "enum": [
+              "text/plain",
+              "text/markdown"
+            ],
+            "title": "Mime Type",
+            "type": "string"
+          },
+          "source_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Source Label"
+          },
+          "source_origin": {
+            "enum": [
+              "manual_upload",
+              "fixture",
+              "adp_export",
+              "external_reference"
+            ],
+            "title": "Source Origin",
+            "type": "string"
+          },
+          "synthetic": {
+            "title": "Synthetic",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "document_type",
+          "source_origin",
+          "synthetic",
+          "content_text"
+        ],
+        "title": "SourceDocumentRegisterRequest",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -393,7 +471,7 @@
     }
   },
   "info": {
-    "description": "Advisory, evidence-grounded single-candidate evaluation plus the E9 recruitment-case state foundation. Evaluation results are decision support for a human reviewer (decision_support_only=true, human_review_required=true) \u2014 never a hiring decision, ranking, or candidate contact. Case endpoints create and retrieve deterministic workflow state only; they do not import applicants, upload documents, start assessment jobs, send notifications, call Foundry/model backends, or change Copilot Studio. Authentication uses SIMULATED lab identity headers (X-Lab-Actor-Id, X-Lab-Roles; the 'hr' role is required); this is a lab stand-in, never an Entra substitute. Envelope status vocabulary: completed | blocked | validation_failed | unauthorized are emitted; needs_input and error are RESERVED. HTTP mapping per the adopted API contracts: business outcomes return 200 with the envelope status; 400 malformed body; 401 missing identity; 403 authenticated without the required role.",
+    "description": "Advisory, evidence-grounded single-candidate evaluation plus the E9 recruitment-case state foundation and E10 source-document registry. Evaluation results are decision support for a human reviewer (decision_support_only=true, human_review_required=true) \u2014 never a hiring decision, ranking, or candidate contact. Case endpoints create and retrieve deterministic workflow state, and source-document endpoints register small synthetic inline role source text through the workflow Table/Blob seam only; they do not import applicants, create candidate packages, start assessment jobs, send notifications, call Foundry/model backends, create queue messages, or change Copilot Studio. Authentication uses SIMULATED lab identity headers (X-Lab-Actor-Id, X-Lab-Roles; the 'hr' role is required); this is a lab stand-in, never an Entra substitute. Envelope status vocabulary: completed | blocked | validation_failed | unauthorized are emitted; needs_input and error are RESERVED. HTTP mapping per the adopted API contracts: business outcomes return 200 with the envelope status; 400 malformed body; 401 missing identity; 403 authenticated without the required role.",
     "title": "AI HR Hiring Agent Lab API",
     "version": "1.0.0"
   },
@@ -535,6 +613,170 @@
           }
         },
         "summary": "Retrieve deterministic next actions for one recruitment case"
+      }
+    },
+    "/api/cases/{case_id}/source-documents": {
+      "get": {
+        "description": "Returns persisted source-document metadata summaries for one case. The endpoint does not fabricate missing documents and does not read or expose raw document text.",
+        "operationId": "listCaseSourceDocuments",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional caller-supplied correlation id, echoed on early failures. Completed source-document responses return the case correlation id.",
+            "in": "header",
+            "name": "X-Correlation-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List source-document summaries for one recruitment case"
+      },
+      "post": {
+        "description": "Registers one small synthetic inline text source document for an existing recruitment case. The raw text is written through the workflow Blob seam using the canonical role-source path, while metadata, one event, and deterministic task/gate updates are written through the workflow Table seam. This endpoint does not import applicants, create queue messages, call Foundry/model backends, or change Copilot Studio.",
+        "operationId": "registerSourceDocument",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional caller-supplied correlation id, echoed on early failures. Completed source-document responses return the case correlation id.",
+            "in": "header",
+            "name": "X-Correlation-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SourceDocumentRegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Register one synthetic-safe source document for a recruitment case"
+      }
+    },
+    "/api/cases/{case_id}/source-documents/{document_id}": {
+      "get": {
+        "description": "Returns one persisted source-document metadata summary for an existing recruitment case. The endpoint does not read or expose raw document text.",
+        "operationId": "getCaseSourceDocument",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "title": "Document Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional caller-supplied correlation id, echoed on early failures. Completed source-document responses return the case correlation id.",
+            "in": "header",
+            "name": "X-Correlation-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Retrieve one source-document summary"
       }
     },
     "/api/evaluations": {

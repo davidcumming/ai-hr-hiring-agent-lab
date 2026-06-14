@@ -1,4 +1,4 @@
-"""E7 non-goal pins updated after E9's narrow case API foundation."""
+"""E7 non-goal pins updated after E10's narrow document API foundation."""
 
 from __future__ import annotations
 
@@ -10,10 +10,12 @@ import sys
 from tests.conftest import REPO_ROOT
 
 
-E9_CASE_PATHS = {
+CASE_PATHS = {
     "/api/cases",
     "/api/cases/{case_id}",
     "/api/cases/{case_id}/next-actions",
+    "/api/cases/{case_id}/source-documents",
+    "/api/cases/{case_id}/source-documents/{document_id}",
 }
 
 
@@ -24,7 +26,7 @@ def test_e7_public_surface_non_goals_after_e9_case_foundation(make_client):
     assert "/api/evaluations" in paths
     assert "/api/evaluations/retrieve" in paths
     assert "/api/evaluations/{evaluation_id}" in paths
-    assert {path for path in paths if path.startswith("/api/cases")} == E9_CASE_PATHS
+    assert {path for path in paths if path.startswith("/api/cases")} == CASE_PATHS
     assert not any("notifications" in path for path in paths)
 
 

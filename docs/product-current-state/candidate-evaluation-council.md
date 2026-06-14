@@ -38,10 +38,11 @@ identity, no production Copilot Studio surface, and no network dependency
 - E7/E8 define workflow storage contracts for the MVP case workflow: 18 Azure
   Table-shaped entities, canonical Blob path builders, three Queue message
   contracts, a deterministic local workflow store, and a guarded Azure
-  Table/Blob/Queue adapter. E9 wires the Table side into the first case API
-  endpoints. Workflow Blob artifacts, Queue messages, workers, Copilot topics,
-  applicant import, documents, notifications, and live Azure resource creation
-  remain deferred.
+  Table/Blob/Queue adapter. The case API uses the Table side for initial case
+  state and uses the Blob side only for narrow role source-document intake.
+  Queue messages, workers, Copilot topics, applicant import, candidate
+  documents, notifications, document download/read APIs, and live Azure
+  resource creation remain deferred.
 
 ## 2. HTTP API
 
@@ -61,6 +62,9 @@ spec validation in the test suite.
 | `POST` | `/api/cases` | `createRecruitmentCase` | Create the initial recruitment case state. |
 | `GET` | `/api/cases/{case_id}` | `getRecruitmentCase` | Retrieve one persisted recruitment case state snapshot. |
 | `GET` | `/api/cases/{case_id}/next-actions` | `getCaseNextActions` | Retrieve deterministic next actions, open tasks, and active gate blockers. |
+| `POST` | `/api/cases/{case_id}/source-documents` | `registerSourceDocument` | Register one small synthetic role source document and store its raw text through the workflow Blob seam. |
+| `GET` | `/api/cases/{case_id}/source-documents` | `listCaseSourceDocuments` | List persisted source-document metadata summaries for one case. |
+| `GET` | `/api/cases/{case_id}/source-documents/{document_id}` | `getCaseSourceDocument` | Retrieve one persisted source-document metadata summary. |
 
 ### Request headers
 
@@ -102,13 +106,33 @@ field — provider selection is server-side configuration only (test-pinned).
 |---|---|---|
 | `role_title` | yes | Synthetic-safe role title. |
 | `department` | yes | Synthetic-safe department/business unit. |
-| `recruitment_type` | yes | Free-form constrained only to non-empty text for E9. |
+| `recruitment_type` | yes | Free-form constrained only to non-empty text for current case creation. |
 | `case_title` | no | If absent, derived as `{role_title} - {department}`. |
 | `hiring_manager` | no | Optional object with `actor_id`, optional `display_name`, and `confirmed` boolean. |
 
 The schema rejects extra fields. It does not accept applicant data, resume
-text, documents, rubric content, candidate refs, provider selection, backend
-selection, or Copilot topic state.
+text, source documents, rubric content, candidate refs, provider selection,
+backend selection, or Copilot topic state.
+
+### Request body (`POST /api/cases/{case_id}/source-documents`)
+
+`SourceDocumentRegisterRequest` (`domain/schemas/cases.py`,
+`extra="forbid"`):
+
+| Field | Required | Notes |
+|---|---|---|
+| `document_type` | yes | One of `job_description`, `adp_export`, `posting_source`, `org_context`, `business_note`, or `other_role_source`. |
+| `source_origin` | yes | One of `manual_upload`, `fixture`, `adp_export`, or `external_reference`. |
+| `source_label` | no | Optional safe human-readable label. |
+| `file_name` | no | Optional safe file name metadata. |
+| `mime_type` | no | Defaults to `text/plain`; only `text/plain` and `text/markdown` are accepted. |
+| `synthetic` | yes | Must be `true`; the lab API rejects real applicant/source data for this route. |
+| `content_text` | yes | Small synthetic inline text only, nonblank after trimming and capped at 20,000 characters. |
+
+The schema rejects extra fields. It does not accept client-supplied document
+IDs, hashes, sizes, Blob paths, candidate IDs, queue hints, processing status,
+multipart upload, binary file upload, metadata-only registration, or
+structured artifact payloads.
 
 ### Response envelope
 
@@ -171,6 +195,19 @@ case and `GET` next-actions are read-only and do not write `case_opened` or
 messages derived from persisted tasks and gates; no model recommendation is
 generated.
 
+The source-document handlers authenticate and authorize first. `POST
+/api/cases/{case_id}/source-documents` validates a strict JSON body, verifies
+the case exists, generates a `doc-*` id, writes the raw UTF-8 text to
+`case-documents/cases/{case_id}/role-source/{document_id}/raw`, writes one
+`SourceDocuments` row, writes one `CaseEvents` row with
+`event_type="source_document_registered"`, and completes the existing
+`attach_source_documents` task plus satisfies the existing
+`source_documents_required` gate when those rows exist. It does not fabricate
+missing task/gate rows on partial cases. The list/get document endpoints
+return persisted metadata summaries only; they do not read or expose raw
+document text. Unknown document ids return `validation_failed` with
+`errors=["unknown_document_id"]`.
+
 ### Copilot-facing action contract and lab topic workflow
 
 The curated Swagger 2.0 artifact
@@ -181,9 +218,10 @@ OpenAPI 3.1 contract. It exposes exactly three Copilot-facing actions:
 The submit request remains fixture-reference-only for Copilot Studio
 registration: `position_id`, `candidate_ref`, optional `idempotency_key`,
 optional `evaluation_question`, and optional `requested_rigor`; inline resume
-and cover-letter text are not exposed in the curated connector artifact. E9
-case endpoints are present only in the source OpenAPI contract; the curated
-Copilot Swagger intentionally exposes no case actions.
+and cover-letter text are not exposed in the curated connector artifact. Case
+and source-document endpoints are present only in the source OpenAPI contract;
+the curated Copilot Swagger intentionally exposes no case or source-document
+actions.
 
 A manual Copilot Studio lab topic workflow exists for one synthetic sample
 candidate path:
@@ -411,16 +449,18 @@ unless a later slice implements Table-backed persistence.
 
 E7/E8 workflow-storage boundary: `domain/schemas/workflow.py`,
 `workflow_artifacts.py`, and `workflow_queue.py` define the Table, Blob, and
-Queue contracts for future case/workflow slices, while
+Queue contracts for case/workflow slices, while
 `persistence/workflow_storage.py` defines the internal protocols and selector.
 `LocalWorkflowStore` is selected by default as `app.state.workflow_storage`
 and persists those shapes locally under `<root>/workflow/` as JSONL rows,
 files, and queue-message JSONL. `AzureWorkflowStorageBackend` can map the same
 contracts to Azure Table Storage, Blob Storage, and Queue Storage only when
 explicitly selected and guarded by `HRHA_ENABLE_AZURE_WORKFLOW_STORAGE=true`;
-it imports Azure SDK modules lazily after guard validation. No public case API,
-notification API, worker loop, Copilot surface, or Azure resource creation is
-added by this boundary.
+it imports Azure SDK modules lazily after guard validation. The current public
+case facade uses this boundary for initial case Table rows and role
+source-document Blob/metadata writes only. No notification API, worker loop,
+Copilot surface, queue producer, applicant import, candidate document route,
+or Azure resource creation is added by this boundary.
 
 ## 12. Review queue
 
@@ -573,10 +613,11 @@ script's stdout is test-verified to contain no resume or prompt text.
   rows + transcripts; scaffolds/provider registry/guards; prompt registry;
   OpenAPI + header behavior; CLI demo + smoke scripts), and the E7 workflow
   foundation tests (`test_e7_*`: workflow schemas, Blob paths, Queue
-  messages, local workflow store, and non-goals).
+  messages, local workflow store, and non-goals), and focused
+  source-document service/API tests.
   `tests/live_evals/test_le_stubs.py` holds LE-001…LE-007 stubs that **skip**
   with a documented rationale (no live model behavior exists to evaluate).
-  Verified result (2026-06-13): 293 passed, 7 skipped, 0 failed.
+  Verified result (2026-06-14): 302 passed, 7 skipped, 0 failed.
 - `.github/workflows/ci.yml` — on PR and push to main: Python 3.10,
   `pip install -e ".[dev]"`, `pytest -q`, and the OpenAPI drift check. No
   cloud credentials, no deployment.

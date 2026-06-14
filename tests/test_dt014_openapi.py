@@ -49,6 +49,8 @@ def test_routes_and_status_vocabulary_conform():
         "/api/cases",
         "/api/cases/{case_id}",
         "/api/cases/{case_id}/next-actions",
+        "/api/cases/{case_id}/source-documents",
+        "/api/cases/{case_id}/source-documents/{document_id}",
         "/api/evaluations",
         "/api/evaluations/retrieve",
         "/api/evaluations/{evaluation_id}",
@@ -56,6 +58,9 @@ def test_routes_and_status_vocabulary_conform():
     assert "post" in paths["/api/cases"]
     assert "get" in paths["/api/cases/{case_id}"]
     assert "get" in paths["/api/cases/{case_id}/next-actions"]
+    assert "post" in paths["/api/cases/{case_id}/source-documents"]
+    assert "get" in paths["/api/cases/{case_id}/source-documents"]
+    assert "get" in paths["/api/cases/{case_id}/source-documents/{document_id}"]
     assert "post" in paths["/api/evaluations"]
     assert "post" in paths["/api/evaluations/retrieve"]
     assert "get" in paths["/api/evaluations/{evaluation_id}"]
@@ -64,6 +69,20 @@ def test_routes_and_status_vocabulary_conform():
     assert (
         paths["/api/cases/{case_id}/next-actions"]["get"]["operationId"]
         == "getCaseNextActions"
+    )
+    assert (
+        paths["/api/cases/{case_id}/source-documents"]["post"]["operationId"]
+        == "registerSourceDocument"
+    )
+    assert (
+        paths["/api/cases/{case_id}/source-documents"]["get"]["operationId"]
+        == "listCaseSourceDocuments"
+    )
+    assert (
+        paths["/api/cases/{case_id}/source-documents/{document_id}"]["get"][
+            "operationId"
+        ]
+        == "getCaseSourceDocument"
     )
     assert (
         paths["/api/evaluations/retrieve"]["post"]["operationId"]
@@ -110,6 +129,7 @@ def test_routes_and_status_vocabulary_conform():
     components = spec["components"]["schemas"]
     assert "RecruitmentCaseCreateRequest" in components
     assert "HiringManagerInput" in components
+    assert "SourceDocumentRegisterRequest" in components
     create_case_component = components["RecruitmentCaseCreateRequest"]
     assert "$defs" not in create_case_component
     assert {
@@ -128,3 +148,31 @@ def test_routes_and_status_vocabulary_conform():
     case_envelope = spec["components"]["schemas"]["CaseEnvelope"]
     assert "next_actions" in case_envelope["properties"]
     assert "case_id" in case_envelope["properties"]
+
+    source_doc_request_body = paths["/api/cases/{case_id}/source-documents"]["post"][
+        "requestBody"
+    ]
+    source_doc_schema = source_doc_request_body["content"]["application/json"]["schema"]
+    assert source_doc_schema == {
+        "$ref": "#/components/schemas/SourceDocumentRegisterRequest"
+    }
+    assert "$defs" not in source_doc_schema
+    assert "#/$defs/" not in json.dumps(source_doc_request_body)
+
+    source_doc_component = components["SourceDocumentRegisterRequest"]
+    assert "$defs" not in source_doc_component
+    assert {
+        "document_type",
+        "source_origin",
+        "source_label",
+        "file_name",
+        "mime_type",
+        "synthetic",
+        "content_text",
+    } == set(source_doc_component["properties"])
+    assert source_doc_component["required"] == [
+        "document_type",
+        "source_origin",
+        "synthetic",
+        "content_text",
+    ]
