@@ -68,6 +68,26 @@ Copilot state.
 - GET responses return artifact payloads and metadata only; raw source-document
   text is not read or returned.
 
+## Manual Gate A Troubleshooting Diagnostic
+
+After E11 deployment, hosted Manual Gate A troubleshooting may use
+`GET /api/diagnostics/workflow-storage` to isolate workflow Table, Blob, and
+Queue connectivity from the normal case-creation path. This endpoint is
+guarded troubleshooting-only behavior, not product behavior and not a Copilot
+tool surface.
+
+- It is disabled unless `HRHA_ENABLE_DIAGNOSTICS=true`.
+- It is hidden from source OpenAPI and the curated Copilot Swagger.
+- It still requires the simulated lab auth headers `X-Lab-Actor-Id` and
+  `X-Lab-Roles: hr`.
+- It reports only safe booleans and class names for selected workflow storage
+  configuration; it does not return account URLs, function keys, SAS tokens,
+  account keys, connection strings, client IDs, or raw credential values.
+- It writes, reads, and deletes only synthetic diagnostic workflow storage
+  state for `case-diag-workflow-storage`.
+- The Queue probe skips receive/delete when the configured workflow queue is
+  not empty, so it does not delete existing workflow messages.
+
 ## Boundaries Preserved
 
 - No Copilot Studio topic, connector action, or curated role/rubric Swagger was

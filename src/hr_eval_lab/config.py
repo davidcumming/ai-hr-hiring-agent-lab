@@ -82,6 +82,8 @@ ENV_PROVIDER_KILL_SWITCH = "HRHA_PROVIDER_KILL_SWITCH"
 ENV_ENABLE_AZURE_STORAGE = "HRHA_ENABLE_AZURE_STORAGE"
 #: E8 guarded workflow storage gate. Read only when workflow backend is azure.
 ENV_ENABLE_AZURE_WORKFLOW_STORAGE = "HRHA_ENABLE_AZURE_WORKFLOW_STORAGE"
+#: Guard for hidden, troubleshooting-only diagnostics endpoints.
+ENV_ENABLE_DIAGNOSTICS = "HRHA_ENABLE_DIAGNOSTICS"
 #: Azure Functions wrapper-only storage backend overlay.
 ENV_STORAGE_BACKEND = "HRHA_STORAGE_BACKEND"
 ENV_STORAGE_ACCOUNT_URL = "HRHA_STORAGE_ACCOUNT_URL"
@@ -118,6 +120,11 @@ def azure_workflow_storage_enabled() -> bool:
         os.environ.get(ENV_ENABLE_AZURE_WORKFLOW_STORAGE, "false").strip().lower()
         == "true"
     )
+
+
+def diagnostics_enabled() -> bool:
+    """True only when HRHA_ENABLE_DIAGNOSTICS is explicitly 'true'."""
+    return os.environ.get(ENV_ENABLE_DIAGNOSTICS, "false").strip().lower() == "true"
 
 
 class RigorConfig(BaseModel):

@@ -24,6 +24,7 @@ from hr_eval_lab.api.errors import (
     malformed_body_handler,
 )
 from hr_eval_lab.api.routes_cases import router as cases_router
+from hr_eval_lab.api.routes_diagnostics import router as diagnostics_router
 from hr_eval_lab.api.routes_evaluations import router as evaluations_router
 from hr_eval_lab.api.routes_role_intake_rubrics import router as role_intake_rubrics_router
 from hr_eval_lab.api.routes_source_documents import router as source_documents_router
@@ -152,6 +153,7 @@ def create_app(
     app.include_router(cases_router)
     app.include_router(source_documents_router)
     app.include_router(role_intake_rubrics_router)
+    app.include_router(diagnostics_router)
     _install_case_openapi_components(app)
 
     logger = get_logger("app")
