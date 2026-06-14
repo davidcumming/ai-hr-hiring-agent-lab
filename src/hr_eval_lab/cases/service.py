@@ -42,6 +42,14 @@ _TASK_ACTION_TEXT: dict[str, tuple[str, str]] = {
         "Confirm hiring manager",
         "Confirm the hiring manager participant before role approvals are requested.",
     ),
+    "confirm_applicant_set": (
+        "Confirm applicant set",
+        "Review complete candidate packages and confirm the applicant set.",
+    ),
+    "resolve_import_findings": (
+        "Resolve import findings",
+        "Address blocking candidate-package findings before confirming applicants.",
+    ),
 }
 
 

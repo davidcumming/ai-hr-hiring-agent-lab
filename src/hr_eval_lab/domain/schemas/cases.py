@@ -9,7 +9,9 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from hr_eval_lab.domain.schemas.workflow import (
     CaseRole,
     CaseStatus,
+    CandidatePackageStatus,
     GateStatus,
+    ApplicantImportStatus,
     SourceDocumentStatus,
     TaskStatus,
 )
@@ -55,6 +57,7 @@ WorkflowArtifactStatus = Literal[
     "rejected",
     "exported",
 ]
+ImportFindingSeverity = Literal["blocking", "warning"]
 
 
 def _strip_string_list(values: list[str], label: str) -> list[str]:
@@ -116,6 +119,108 @@ class SourceDocumentRegisterRequest(BaseModel):
     def _strip_strings(cls, value: str | None, info) -> str | None:
         if value is None:
             return None
+        return _strip_required(value, info.field_name)
+
+    @field_validator("synthetic")
+    @classmethod
+    def _require_synthetic_true(cls, value: bool) -> bool:
+        if value is not True:
+            raise ValueError("synthetic must be true")
+        return value
+
+
+class ApplicantCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    synthetic: bool
+    candidate_ref: str = Field(min_length=1, max_length=120)
+    display_label: str | None = Field(default=None, max_length=160)
+
+    @field_validator("candidate_ref", "display_label")
+    @classmethod
+    def _strip_strings(cls, value: str | None, info) -> str | None:
+        if value is None:
+            return None
+        return _strip_required(value, info.field_name)
+
+    @field_validator("synthetic")
+    @classmethod
+    def _require_synthetic_true(cls, value: bool) -> bool:
+        if value is not True:
+            raise ValueError("synthetic must be true")
+        return value
+
+
+class CandidateDocumentRegisterRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    document_type: str = Field(min_length=1, max_length=80)
+    source_origin: SourceDocumentRequestOrigin
+    source_label: str | None = Field(default=None, max_length=160)
+    file_name: str | None = Field(default=None, max_length=240)
+    mime_type: SourceDocumentMimeType = "text/plain"
+    synthetic: bool
+    content_text: str = Field(min_length=1, max_length=20_000)
+
+    @field_validator("document_type", "source_label", "file_name", "content_text")
+    @classmethod
+    def _strip_strings(cls, value: str | None, info) -> str | None:
+        if value is None:
+            return None
+        return _strip_required(value, info.field_name)
+
+    @field_validator("synthetic")
+    @classmethod
+    def _require_synthetic_true(cls, value: bool) -> bool:
+        if value is not True:
+            raise ValueError("synthetic must be true")
+        return value
+
+
+class ApplicantImportCandidateInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    candidate_ref: str = Field(min_length=1, max_length=120)
+    display_label: str | None = Field(default=None, max_length=160)
+    documents: list[CandidateDocumentRegisterRequest] = Field(
+        default_factory=list,
+        max_length=10,
+    )
+
+    @field_validator("candidate_ref", "display_label")
+    @classmethod
+    def _strip_strings(cls, value: str | None, info) -> str | None:
+        if value is None:
+            return None
+        return _strip_required(value, info.field_name)
+
+
+class ApplicantImportRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    synthetic: bool
+    candidates: list[ApplicantImportCandidateInput] = Field(min_length=1)
+
+    @field_validator("synthetic")
+    @classmethod
+    def _require_synthetic_true(cls, value: bool) -> bool:
+        if value is not True:
+            raise ValueError("synthetic must be true")
+        return value
+
+
+class ApplicantSetConfirmRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    synthetic: bool
+    applicant_set_version: str = Field(
+        default="v1",
+        pattern=r"^v[0-9][A-Za-z0-9._-]{0,31}$",
+    )
+
+    @field_validator("applicant_set_version")
+    @classmethod
+    def _strip_strings(cls, value: str, info) -> str:
         return _strip_required(value, info.field_name)
 
     @field_validator("synthetic")
@@ -337,6 +442,65 @@ class SourceDocumentSummary(BaseModel):
     synthetic: bool = True
 
 
+class CandidateDocumentSummary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    document_id: str
+    candidate_id: str
+    document_type: str
+    source_origin: str
+    source_label: str | None = None
+    blob_path: str
+    mime_type: str | None = None
+    file_name: str | None = None
+    size_bytes: int
+    sha256: str
+    processing_status: SourceDocumentStatus
+    version: str
+    created_at: str
+    synthetic: bool = True
+
+
+class ApplicantSummary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    candidate_id: str
+    candidate_ref: str
+    display_label: str
+    import_status: ApplicantImportStatus
+    applicant_set_version: str
+    duplicate_group_id: str | None = None
+    blocking_findings: list[str] = Field(default_factory=list)
+    created_at: str
+    synthetic: bool = True
+
+
+class CandidatePackageSummary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    candidate_id: str
+    package_version: str
+    rubric_version: str
+    document_ids: list[str] = Field(default_factory=list)
+    required_document_status: dict[str, str] = Field(default_factory=dict)
+    package_status: CandidatePackageStatus
+    blob_path: str
+    sha256: str
+    created_at: str
+    synthetic: bool = True
+
+
+class ImportFinding(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    finding_id: str
+    severity: ImportFindingSeverity
+    finding_type: str
+    message: str
+    candidate_id: str | None = None
+    candidate_ref: str | None = None
+
+
 class WorkflowArtifactSummary(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -433,6 +597,76 @@ class SourceDocumentGetResult(BaseModel):
 
     case_id: str
     document: SourceDocumentSummary
+
+
+class ApplicantRegistrationResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    case: CaseSummary
+    applicant: ApplicantSummary
+    package: CandidatePackageSummary
+    findings: list[ImportFinding] = Field(default_factory=list)
+
+
+class ApplicantListResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    case_id: str
+    applicants: list[ApplicantSummary] = Field(default_factory=list)
+    packages: list[CandidatePackageSummary] = Field(default_factory=list)
+    findings: list[ImportFinding] = Field(default_factory=list)
+    can_confirm: bool = False
+
+
+class ApplicantDetailResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    case_id: str
+    applicant: ApplicantSummary
+    documents: list[CandidateDocumentSummary] = Field(default_factory=list)
+    package: CandidatePackageSummary | None = None
+    findings: list[ImportFinding] = Field(default_factory=list)
+
+
+class CandidateDocumentRegistrationResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    case: CaseSummary
+    applicant: ApplicantSummary
+    document: CandidateDocumentSummary
+    package: CandidatePackageSummary
+    findings: list[ImportFinding] = Field(default_factory=list)
+
+
+class ApplicantImportResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    case: CaseSummary
+    applicants: list[ApplicantSummary] = Field(default_factory=list)
+    packages: list[CandidatePackageSummary] = Field(default_factory=list)
+    findings: list[ImportFinding] = Field(default_factory=list)
+    imported_count: int
+    document_count: int
+    can_confirm: bool = False
+
+
+class ImportFindingsResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    case_id: str
+    findings: list[ImportFinding] = Field(default_factory=list)
+    packages: list[CandidatePackageSummary] = Field(default_factory=list)
+    can_confirm: bool = False
+
+
+class ApplicantSetConfirmationResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    case: CaseSummary
+    confirmed_applicant_set_version: str
+    confirmed_candidate_ids: list[str] = Field(default_factory=list)
+    packages: list[CandidatePackageSummary] = Field(default_factory=list)
+    assessment_unlocked: Literal["locked"] = "locked"
 
 
 class CaseEnvelope(BaseModel):

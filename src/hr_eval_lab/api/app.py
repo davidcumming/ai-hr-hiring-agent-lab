@@ -26,11 +26,17 @@ from hr_eval_lab.api.errors import (
 from hr_eval_lab.api.routes_cases import router as cases_router
 from hr_eval_lab.api.routes_diagnostics import router as diagnostics_router
 from hr_eval_lab.api.routes_evaluations import router as evaluations_router
+from hr_eval_lab.api.routes_applicant_intake import router as applicant_intake_router
 from hr_eval_lab.api.routes_role_intake_rubrics import router as role_intake_rubrics_router
 from hr_eval_lab.api.routes_source_documents import router as source_documents_router
 from hr_eval_lab.config import LabConfig, load_config
 from hr_eval_lab.domain.schemas.cases import (
+    ApplicantCreateRequest,
+    ApplicantImportCandidateInput,
+    ApplicantImportRequest,
+    ApplicantSetConfirmRequest,
     ApprovedRubricRegisterRequest,
+    CandidateDocumentRegisterRequest,
     HiringManagerInput,
     RecruitmentCaseCreateRequest,
     RoleIntakeCreateRequest,
@@ -50,17 +56,21 @@ OPENAPI_VERSION = "1.0.0"
 OPENAPI_DESCRIPTION = (
     "Advisory, evidence-grounded single-candidate evaluation plus the E9 "
     "recruitment-case state foundation, E10 source-document registry, and "
-    "E11 role-intake/rubric foundation. "
+    "E11 role-intake/rubric foundation, and E12 applicant/candidate-package "
+    "intake foundation. "
     "Evaluation results are decision "
     "support for a human reviewer (decision_support_only=true, "
     "human_review_required=true) — never a hiring decision, ranking, or "
     "candidate contact. Case endpoints create and retrieve deterministic "
     "workflow state, source-document endpoints register small synthetic "
     "inline role source text, and E11 endpoints version synthetic role-intake "
-    "and approved rubric artifacts through the workflow Table/Blob seam only; "
-    "they do not import applicants, create candidate packages, start assessment "
-    "jobs, send notifications, call Foundry/model backends, create queue "
-    "messages, unlock assessment, or change Copilot Studio. Authentication uses SIMULATED lab identity "
+    "and approved rubric artifacts through the workflow Table/Blob seam only. "
+    "E12 applicant endpoints register up to five synthetic applicants, "
+    "candidate-linked document metadata, package metadata artifacts, computed "
+    "import findings, and applicant-set confirmation through the same workflow "
+    "Table/Blob seam. Case/applicant endpoints do not start assessment jobs, "
+    "send notifications, call Foundry/model backends, create queue messages, "
+    "unlock assessment, or change Copilot Studio. Authentication uses SIMULATED lab identity "
     "headers (X-Lab-Actor-Id, X-Lab-Roles; the 'hr' role is required); this "
     "is a lab stand-in, never an Entra substitute. Envelope status vocabulary: "
     "completed | blocked | validation_failed | unauthorized are emitted; "
@@ -81,6 +91,11 @@ def _case_request_component_schemas() -> dict[str, Any]:
             (ApprovedRubricRegisterRequest, "validation"),
             (RubricCriterionInput, "validation"),
             (RubricRatingAnchorInput, "validation"),
+            (ApplicantCreateRequest, "validation"),
+            (CandidateDocumentRegisterRequest, "validation"),
+            (ApplicantImportCandidateInput, "validation"),
+            (ApplicantImportRequest, "validation"),
+            (ApplicantSetConfirmRequest, "validation"),
         ],
         ref_template="#/components/schemas/{model}",
     )
@@ -153,6 +168,7 @@ def create_app(
     app.include_router(cases_router)
     app.include_router(source_documents_router)
     app.include_router(role_intake_rubrics_router)
+    app.include_router(applicant_intake_router)
     app.include_router(diagnostics_router)
     _install_case_openapi_components(app)
 

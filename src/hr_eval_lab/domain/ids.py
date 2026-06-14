@@ -26,6 +26,10 @@ def new_document_id() -> str:
     return "doc-" + uuid.uuid4().hex[:20]
 
 
+def new_candidate_id() -> str:
+    return "cand-" + uuid.uuid4().hex[:20]
+
+
 def new_approval_id() -> str:
     return "approval-" + uuid.uuid4().hex[:20]
 

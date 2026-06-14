@@ -1,4 +1,4 @@
-"""E7 non-goal pins updated after E10's narrow document API foundation."""
+"""E7 non-goal pins updated through E12's applicant intake foundation."""
 
 from __future__ import annotations
 
@@ -13,6 +13,12 @@ from tests.conftest import REPO_ROOT
 CASE_PATHS = {
     "/api/cases",
     "/api/cases/{case_id}",
+    "/api/cases/{case_id}/applicant-imports",
+    "/api/cases/{case_id}/applicant-set/confirm",
+    "/api/cases/{case_id}/applicants",
+    "/api/cases/{case_id}/applicants/{candidate_id}",
+    "/api/cases/{case_id}/candidates/{candidate_id}/documents",
+    "/api/cases/{case_id}/import-findings",
     "/api/cases/{case_id}/next-actions",
     "/api/cases/{case_id}/source-documents",
     "/api/cases/{case_id}/source-documents/{document_id}",

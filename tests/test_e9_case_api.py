@@ -16,6 +16,12 @@ from tests.conftest import CountingProvider, HR_HEADERS, identity_headers
 CASE_PATHS = {
     "/api/cases",
     "/api/cases/{case_id}",
+    "/api/cases/{case_id}/applicant-imports",
+    "/api/cases/{case_id}/applicant-set/confirm",
+    "/api/cases/{case_id}/applicants",
+    "/api/cases/{case_id}/applicants/{candidate_id}",
+    "/api/cases/{case_id}/candidates/{candidate_id}/documents",
+    "/api/cases/{case_id}/import-findings",
     "/api/cases/{case_id}/next-actions",
     "/api/cases/{case_id}/source-documents",
     "/api/cases/{case_id}/source-documents/{document_id}",
@@ -246,6 +252,16 @@ def test_e9_case_api_openapi_contract_and_route_non_goals(client):
         == "getCaseNextActions"
     )
     assert (
+        spec["paths"]["/api/cases/{case_id}/applicants"]["post"]["operationId"]
+        == "registerApplicant"
+    )
+    assert (
+        spec["paths"]["/api/cases/{case_id}/applicant-set/confirm"]["post"][
+            "operationId"
+        ]
+        == "confirmApplicantSet"
+    )
+    assert (
         spec["paths"]["/api/cases/{case_id}/source-documents"]["post"][
             "operationId"
         ]
@@ -266,7 +282,6 @@ def test_e9_case_api_openapi_contract_and_route_non_goals(client):
     serialized_paths = json.dumps(sorted(paths))
     for deferred in (
         "notifications",
-        "applicants",
         "assessments",
         "human-reviews",
         "final-recommendation",

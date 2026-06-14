@@ -4,7 +4,7 @@ Present-tense reference for what the system does today. Sources: the modules
 under `src/hr_eval_lab/`, `config/lab-config.toml`, `fixtures/`,
 `openapi/evaluations-api.json`, and the deterministic test suite under
 `tests/` (DT-001…DT-018 plus the RP storage/provider/prompt/contract suite;
-314 passed / 7 deferred-live-eval skips / 0 failed, verified 2026-06-14).
+334 passed / 7 deferred-live-eval skips / 0 failed, verified 2026-06-14).
 Claims that rest on code inspection alone (no dedicated test) are flagged
 inline.
 
@@ -40,11 +40,13 @@ identity, no production Copilot Studio surface, and no network dependency
   contracts, a deterministic local workflow store, and a guarded Azure
   Table/Blob/Queue adapter. The case API uses the Table side for initial case
   state, source-document metadata, role-intake/rubric artifact versions,
-  rubric approval metadata, and events. It uses the Blob side for narrow role
-  source-document intake and synthetic role-intake/rubric artifacts. Queue
-  messages, workers, Copilot topics, applicant import, candidate documents,
-  notifications, assessment readiness unlock, document download/read APIs, and
-  live Azure resource creation remain deferred.
+  rubric approval metadata, applicant/package metadata, candidate-linked
+  source-document metadata, and events. It uses the Blob side for narrow role
+  source-document intake, synthetic role-intake/rubric artifacts, candidate
+  document raw text, and candidate package metadata artifacts. Queue messages,
+  workers, Copilot topics for case/applicant workflow, notifications,
+  assessment readiness unlock, document download/read APIs, and live Azure
+  resource creation remain deferred.
 
 ## 2. HTTP API
 
@@ -72,6 +74,13 @@ spec validation in the test suite.
 | `POST` | `/api/cases/{case_id}/rubrics` | `registerApprovedRubric` | Register one approved synthetic screening rubric version. |
 | `GET` | `/api/cases/{case_id}/rubrics` | `listCaseRubrics` | List persisted rubric artifact versions for one case. |
 | `GET` | `/api/cases/{case_id}/rubrics/{rubric_version}` | `getCaseRubric` | Retrieve one approved rubric artifact version. |
+| `POST` | `/api/cases/{case_id}/applicants` | `registerApplicant` | Register one synthetic applicant and initialize candidate package metadata. |
+| `GET` | `/api/cases/{case_id}/applicants` | `listCaseApplicants` | List applicant/package metadata and computed import findings. |
+| `GET` | `/api/cases/{case_id}/applicants/{candidate_id}` | `getCaseApplicant` | Retrieve one applicant, candidate-document metadata, package metadata, and findings. |
+| `POST` | `/api/cases/{case_id}/candidates/{candidate_id}/documents` | `registerCandidateDocument` | Register one synthetic candidate-linked document and refresh package metadata. |
+| `POST` | `/api/cases/{case_id}/applicant-imports` | `processApplicantImport` | Process a deterministic synthetic applicant import of up to five active applicants. |
+| `GET` | `/api/cases/{case_id}/import-findings` | `getImportFindings` | Compute import/package findings from applicant, document, and package rows. |
+| `POST` | `/api/cases/{case_id}/applicant-set/confirm` | `confirmApplicantSet` | Confirm the applicant set when packages are complete; assessment remains locked. |
 
 ### Request headers
 
@@ -184,6 +193,64 @@ candidate/applicant content, provider/model/backend selection, queue hints,
 assessment flags, client-supplied Blob paths/hashes/artifact ids, and
 client-supplied approval ids.
 
+### Request body (`POST /api/cases/{case_id}/applicants`)
+
+`ApplicantCreateRequest` (`domain/schemas/cases.py`, `extra="forbid"`):
+
+| Field | Required | Notes |
+|---|---|---|
+| `synthetic` | yes | Must be `true`. |
+| `candidate_ref` | yes | Case-unique synthetic applicant reference, compared case-insensitively after trimming. |
+| `display_label` | no | Optional safe display label; defaults to `candidate_ref`. |
+
+The route generates the path-safe `cand-*` candidate id. The schema rejects
+extra fields, raw document text, client-supplied candidate ids, Blob paths,
+hashes, package status, assessment flags, and provider/backend selection.
+
+### Request body (`POST /api/cases/{case_id}/candidates/{candidate_id}/documents`)
+
+`CandidateDocumentRegisterRequest` (`domain/schemas/cases.py`,
+`extra="forbid"`):
+
+| Field | Required | Notes |
+|---|---|---|
+| `document_type` | yes | String parsed semantically by the service; E12 accepts `resume`, `cover_letter`, and `other_candidate_source`. Unsupported values return a `validation_failed` envelope, not HTTP 400. |
+| `source_origin` | yes | One of `manual_upload`, `fixture`, `adp_export`, or `external_reference`. |
+| `source_label` | no | Optional safe human-readable label. |
+| `file_name` | no | Optional safe file name metadata. |
+| `mime_type` | no | Defaults to `text/plain`; only `text/plain` and `text/markdown` are accepted. |
+| `synthetic` | yes | Must be `true`. |
+| `content_text` | yes | Small synthetic inline text only, nonblank after trimming and capped at 20,000 characters. |
+
+The route writes raw text to
+`case-documents/cases/{case_id}/candidates/{candidate_id}/{document_id}/raw`
+and returns metadata only. List/get applicant responses do not expose raw
+candidate document text.
+
+### Request body (`POST /api/cases/{case_id}/applicant-imports`)
+
+`ApplicantImportRequest` contains `synthetic: true` and a non-empty
+`candidates` list. Each candidate supplies `candidate_ref`, optional
+`display_label`, and up to 10 inline `CandidateDocumentRegisterRequest`
+objects. The service preflights the entire batch before writes: unknown case,
+duplicate candidate refs, unsupported document types, and active applicant
+cap violations return `validation_failed`. The first-demo active applicant
+cap is five non-excluded applicants per case.
+
+### Request body (`POST /api/cases/{case_id}/applicant-set/confirm`)
+
+`ApplicantSetConfirmRequest` contains `synthetic: true` and optional
+`applicant_set_version` (default `v1`). Confirmation requires at least one
+complete candidate package and no blocking findings across active applicants.
+Successful confirmation sets applicant rows to `confirmed`, records
+`RecruitmentCases.applicant_set_version`, satisfies the
+`applicant_set_confirmation_required` gate, completes
+`task#confirm_applicant_set`, and leaves `assessment_unlocked` locked for
+later readiness/assessment slices. After confirmation, E12 applicant/package
+mutation routes reject additional applicant, candidate-document, and import
+writes with `errors=["applicant_set_locked"]`; later slices may introduce
+versioned reopening if that workflow is needed.
+
 ### Response envelope
 
 Evaluation responses use the standard envelope (`api/envelope.py`):
@@ -278,6 +345,29 @@ versions return `validation_failed`; unknown rubric versions return
 do not expose raw source-document text, do not enqueue work, and do not unlock
 `assessment_unlocked`.
 
+The applicant-intake handlers authenticate and authorize first. `POST
+/api/cases/{case_id}/applicants` validates a strict JSON body, verifies the
+case exists, enforces duplicate/cap preflight, generates a path-safe `cand-*`
+id, writes an initial candidate package artifact to
+`case-artifacts/cases/{case_id}/candidate-packages/{candidate_id}/v1/package.json`,
+writes `Applicants`, `CandidatePackages`, and `CaseEvents` rows, and updates
+applicant-set tasks/gates/case fields. `POST
+/api/cases/{case_id}/candidates/{candidate_id}/documents` verifies the case
+and applicant, validates document type semantically, writes raw document bytes
+to the candidate document Blob path, rewrites the package metadata artifact,
+and upserts `SourceDocuments`, `CandidatePackages`, `Applicants`, and a
+business event. `POST /api/cases/{case_id}/applicant-imports` preflights the
+whole batch before writes and then applies the same applicant/document/package
+path. Findings are computed from `Applicants`, candidate-linked
+`SourceDocuments`, and `CandidatePackages`; there is no persistent findings
+table. Missing resume is a blocking finding and keeps the package `blocked`.
+Applicant set confirmation succeeds only when all active applicant packages
+are complete and no blocking findings remain. These handlers do not enqueue
+work, call Foundry/model backends, create assessment jobs, or unlock
+assessment. Once `RecruitmentCases.applicant_set_version` is set, E12 treats
+the applicant package set as immutable and rejects further applicant/package
+mutations before Blob/Table writes.
+
 ### Copilot-facing action contract and lab topic workflow
 
 The curated Swagger 2.0 artifact
@@ -289,9 +379,9 @@ The submit request remains fixture-reference-only for Copilot Studio
 registration: `position_id`, `candidate_ref`, optional `idempotency_key`,
 optional `evaluation_question`, and optional `requested_rigor`; inline resume
 and cover-letter text are not exposed in the curated connector artifact. Case,
-source-document, role-intake, and rubric endpoints are present only in the
-source OpenAPI contract; the curated Copilot Swagger intentionally exposes no
-case workflow actions.
+source-document, role-intake, rubric, applicant, candidate-document, and
+applicant-set endpoints are present only in the source OpenAPI contract; the
+curated Copilot Swagger intentionally exposes no case workflow actions.
 
 A manual Copilot Studio lab topic workflow exists for one synthetic sample
 candidate path:
@@ -311,7 +401,7 @@ so the topic controls the stateful workflow instead of broad standalone tool
 routing pre-empting it. Manual evidence for this workflow is partial and
 note-based: there is no source-controlled Copilot ALM export, durable
 screenshot/export/transcript, production identity, live Foundry execution, or
-multi-candidate workflow evidence.
+Copilot applicant-intake workflow evidence.
 
 ## 3. Authentication and authorization (simulated)
 
@@ -527,10 +617,12 @@ files, and queue-message JSONL. `AzureWorkflowStorageBackend` can map the same
 contracts to Azure Table Storage, Blob Storage, and Queue Storage only when
 explicitly selected and guarded by `HRHA_ENABLE_AZURE_WORKFLOW_STORAGE=true`;
 it imports Azure SDK modules lazily after guard validation. The current public
-case facade uses this boundary for initial case Table rows and role
-source-document Blob/metadata writes only. No notification API, worker loop,
-Copilot surface, queue producer, applicant import, candidate document route,
-or Azure resource creation is added by this boundary.
+case facade uses this boundary for initial case Table rows, role source
+document Blob/metadata writes, role-intake/rubric artifact writes, and
+applicant/candidate-package intake writes. No notification API, worker loop,
+Copilot case/applicant surface, queue producer, assessment job launcher,
+document download/read-body route, assessment unlock, or Azure resource
+creation is added by this boundary.
 
 ## 12. Review queue
 
@@ -725,8 +817,8 @@ script's stdout is test-verified to contain no resume or prompt text.
   `submitted_evaluation_id`, retrieves by body field `evaluation_id`, and
   renders an advisory/audit summary. There is no source-controlled Copilot
   ALM export, durable screenshot/export/transcript, production identity,
-  real applicant data, multi-candidate case workflow, or live Foundry
-  execution.
+  real applicant data, applicant-intake topic workflow, assessment workflow,
+  or live Foundry execution.
 - **Trigger thresholds are first-cut constants**; no calibration mechanism
   exists.
 - **Reserved envelope statuses** `needs_input`/`error` and HTTP 409 are

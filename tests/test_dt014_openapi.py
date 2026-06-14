@@ -48,6 +48,12 @@ def test_routes_and_status_vocabulary_conform():
     assert set(paths) == {
         "/api/cases",
         "/api/cases/{case_id}",
+        "/api/cases/{case_id}/applicant-imports",
+        "/api/cases/{case_id}/applicant-set/confirm",
+        "/api/cases/{case_id}/applicants",
+        "/api/cases/{case_id}/applicants/{candidate_id}",
+        "/api/cases/{case_id}/candidates/{candidate_id}/documents",
+        "/api/cases/{case_id}/import-findings",
         "/api/cases/{case_id}/next-actions",
         "/api/cases/{case_id}/role-intake",
         "/api/cases/{case_id}/rubrics",
@@ -60,6 +66,13 @@ def test_routes_and_status_vocabulary_conform():
     }
     assert "post" in paths["/api/cases"]
     assert "get" in paths["/api/cases/{case_id}"]
+    assert "post" in paths["/api/cases/{case_id}/applicant-imports"]
+    assert "post" in paths["/api/cases/{case_id}/applicant-set/confirm"]
+    assert "post" in paths["/api/cases/{case_id}/applicants"]
+    assert "get" in paths["/api/cases/{case_id}/applicants"]
+    assert "get" in paths["/api/cases/{case_id}/applicants/{candidate_id}"]
+    assert "post" in paths["/api/cases/{case_id}/candidates/{candidate_id}/documents"]
+    assert "get" in paths["/api/cases/{case_id}/import-findings"]
     assert "get" in paths["/api/cases/{case_id}/next-actions"]
     assert "post" in paths["/api/cases/{case_id}/role-intake"]
     assert "get" in paths["/api/cases/{case_id}/role-intake"]
@@ -77,6 +90,36 @@ def test_routes_and_status_vocabulary_conform():
     assert (
         paths["/api/cases/{case_id}/next-actions"]["get"]["operationId"]
         == "getCaseNextActions"
+    )
+    assert (
+        paths["/api/cases/{case_id}/applicant-imports"]["post"]["operationId"]
+        == "processApplicantImport"
+    )
+    assert (
+        paths["/api/cases/{case_id}/applicant-set/confirm"]["post"]["operationId"]
+        == "confirmApplicantSet"
+    )
+    assert (
+        paths["/api/cases/{case_id}/applicants"]["post"]["operationId"]
+        == "registerApplicant"
+    )
+    assert (
+        paths["/api/cases/{case_id}/applicants"]["get"]["operationId"]
+        == "listCaseApplicants"
+    )
+    assert (
+        paths["/api/cases/{case_id}/applicants/{candidate_id}"]["get"]["operationId"]
+        == "getCaseApplicant"
+    )
+    assert (
+        paths["/api/cases/{case_id}/candidates/{candidate_id}/documents"]["post"][
+            "operationId"
+        ]
+        == "registerCandidateDocument"
+    )
+    assert (
+        paths["/api/cases/{case_id}/import-findings"]["get"]["operationId"]
+        == "getImportFindings"
     )
     assert (
         paths["/api/cases/{case_id}/role-intake"]["post"]["operationId"]
@@ -164,6 +207,11 @@ def test_routes_and_status_vocabulary_conform():
     assert "ApprovedRubricRegisterRequest" in components
     assert "RubricCriterionInput" in components
     assert "RubricRatingAnchorInput" in components
+    assert "ApplicantCreateRequest" in components
+    assert "CandidateDocumentRegisterRequest" in components
+    assert "ApplicantImportCandidateInput" in components
+    assert "ApplicantImportRequest" in components
+    assert "ApplicantSetConfirmRequest" in components
     create_case_component = components["RecruitmentCaseCreateRequest"]
     assert "$defs" not in create_case_component
     assert {
@@ -270,3 +318,93 @@ def test_routes_and_status_vocabulary_conform():
         "rubric_title",
         "criteria",
     ]
+
+    applicant_request_body = paths["/api/cases/{case_id}/applicants"]["post"][
+        "requestBody"
+    ]
+    applicant_schema = applicant_request_body["content"]["application/json"]["schema"]
+    assert applicant_schema == {
+        "$ref": "#/components/schemas/ApplicantCreateRequest"
+    }
+    assert "$defs" not in applicant_schema
+    assert "#/$defs/" not in json.dumps(applicant_request_body)
+
+    applicant_component = components["ApplicantCreateRequest"]
+    assert "$defs" not in applicant_component
+    assert {"synthetic", "candidate_ref", "display_label"} == set(
+        applicant_component["properties"]
+    )
+    assert applicant_component["required"] == ["synthetic", "candidate_ref"]
+
+    candidate_document_request_body = paths[
+        "/api/cases/{case_id}/candidates/{candidate_id}/documents"
+    ]["post"]["requestBody"]
+    candidate_document_schema = candidate_document_request_body["content"][
+        "application/json"
+    ]["schema"]
+    assert candidate_document_schema == {
+        "$ref": "#/components/schemas/CandidateDocumentRegisterRequest"
+    }
+    assert "$defs" not in candidate_document_schema
+    assert "#/$defs/" not in json.dumps(candidate_document_request_body)
+
+    candidate_document_component = components["CandidateDocumentRegisterRequest"]
+    assert "$defs" not in candidate_document_component
+    assert {
+        "document_type",
+        "source_origin",
+        "source_label",
+        "file_name",
+        "mime_type",
+        "synthetic",
+        "content_text",
+    } == set(candidate_document_component["properties"])
+    assert candidate_document_component["required"] == [
+        "document_type",
+        "source_origin",
+        "synthetic",
+        "content_text",
+    ]
+    # E12 keeps document_type as a string so semantic unsupported values return
+    # a CaseEnvelope validation_failed outcome instead of a framework 400.
+    assert candidate_document_component["properties"]["document_type"]["type"] == "string"
+    assert "enum" not in candidate_document_component["properties"]["document_type"]
+
+    import_request_body = paths["/api/cases/{case_id}/applicant-imports"]["post"][
+        "requestBody"
+    ]
+    import_schema = import_request_body["content"]["application/json"]["schema"]
+    assert import_schema == {
+        "$ref": "#/components/schemas/ApplicantImportRequest"
+    }
+    assert "$defs" not in import_schema
+    assert "#/$defs/" not in json.dumps(import_request_body)
+
+    import_component = components["ApplicantImportRequest"]
+    assert "$defs" not in import_component
+    assert {"synthetic", "candidates"} == set(import_component["properties"])
+    assert import_component["required"] == ["synthetic", "candidates"]
+
+    import_candidate_component = components["ApplicantImportCandidateInput"]
+    assert "$defs" not in import_candidate_component
+    assert {"candidate_ref", "display_label", "documents"} == set(
+        import_candidate_component["properties"]
+    )
+    assert import_candidate_component["required"] == ["candidate_ref"]
+
+    confirm_request_body = paths["/api/cases/{case_id}/applicant-set/confirm"][
+        "post"
+    ]["requestBody"]
+    confirm_schema = confirm_request_body["content"]["application/json"]["schema"]
+    assert confirm_schema == {
+        "$ref": "#/components/schemas/ApplicantSetConfirmRequest"
+    }
+    assert "$defs" not in confirm_schema
+    assert "#/$defs/" not in json.dumps(confirm_request_body)
+
+    confirm_component = components["ApplicantSetConfirmRequest"]
+    assert "$defs" not in confirm_component
+    assert {"synthetic", "applicant_set_version"} == set(
+        confirm_component["properties"]
+    )
+    assert confirm_component["required"] == ["synthetic"]

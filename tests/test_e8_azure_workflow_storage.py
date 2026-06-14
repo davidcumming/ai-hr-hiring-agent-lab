@@ -8,7 +8,11 @@ import pytest
 from pydantic import ValidationError
 
 from hr_eval_lab.config import AzureStorageConfig, WorkflowStorageConfig
-from hr_eval_lab.domain.schemas.workflow import CandidatePackage, CaseParticipant
+from hr_eval_lab.domain.schemas.workflow import (
+    Applicant,
+    CandidatePackage,
+    CaseParticipant,
+)
 from hr_eval_lab.domain.schemas.workflow_artifacts import candidate_package_path
 from hr_eval_lab.domain.schemas.workflow_queue import RunModelCandidateAssessmentMessage
 from hr_eval_lab.persistence.azure_workflow_storage import AzureWorkflowStorageBackend
@@ -175,6 +179,22 @@ def _case_participant() -> CaseParticipant:
     )
 
 
+def _applicant_with_key_markers() -> Applicant:
+    return Applicant(
+        PartitionKey="case-e8#candidate-keys",
+        RowKey="candidate#cand-e12#keys",
+        created_at="2026-06-13T00:00:00Z",
+        correlation_id="corr-e8-candidate-keys",
+        case_id="case-e8#candidate-keys",
+        candidate_id="cand-e12#keys",
+        candidate_ref="E12-KEYS",
+        display_label="E12 Key Encoding Candidate",
+        import_status="incomplete",
+        applicant_set_version="pending",
+        blocking_findings=["missing_required_resume"],
+    )
+
+
 def _message() -> RunModelCandidateAssessmentMessage:
     return RunModelCandidateAssessmentMessage(
         case_id="case-e8-001",
@@ -312,6 +332,39 @@ def test_e8_azure_table_keys_are_encoded_only_at_adapter_boundary(monkeypatch):
         "hr_specialist#u-hr",
     )
     assert ("case-e8%23keys", "hr_specialist%23u-hr") not in table.rows
+
+
+def test_e8_azure_table_key_encoding_preserves_candidate_applicant_rows(monkeypatch):
+    backend, table_service, _, _ = _backend(monkeypatch)
+    applicant = _applicant_with_key_markers()
+
+    row = backend.upsert_table_entity(applicant)
+    table = table_service.tables["E8Applicants"]
+
+    assert row["PartitionKey"] == "case-e8#candidate-keys"
+    assert row["RowKey"] == "candidate#cand-e12#keys"
+    assert ("case-e8%23candidate-keys", "candidate%23cand-e12%23keys") in table.rows
+    assert ("case-e8#candidate-keys", "candidate#cand-e12#keys") not in table.rows
+
+    restored = backend.get_table_entity(
+        Applicant,
+        "case-e8#candidate-keys",
+        "candidate#cand-e12#keys",
+    )
+    listed = backend.list_table_entities(
+        Applicant,
+        partition_key="case-e8#candidate-keys",
+    )
+
+    assert restored is not None
+    assert restored.PartitionKey == "case-e8#candidate-keys"
+    assert restored.RowKey == "candidate#cand-e12#keys"
+    assert restored.candidate_id == "cand-e12#keys"
+    assert restored.blocking_findings == ["missing_required_resume"]
+    assert listed[0].PartitionKey == "case-e8#candidate-keys"
+    assert listed[0].RowKey == "candidate#cand-e12#keys"
+    assert "%23" not in restored.RowKey
+    assert "%23" not in listed[0].PartitionKey
 
 
 def test_e8_local_workflow_store_keeps_logical_table_keys(tmp_path):

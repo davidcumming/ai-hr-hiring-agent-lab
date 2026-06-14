@@ -1,6 +1,120 @@
 {
   "components": {
     "schemas": {
+      "ApplicantCreateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "candidate_ref": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Candidate Ref",
+            "type": "string"
+          },
+          "display_label": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Display Label"
+          },
+          "synthetic": {
+            "title": "Synthetic",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "synthetic",
+          "candidate_ref"
+        ],
+        "title": "ApplicantCreateRequest",
+        "type": "object"
+      },
+      "ApplicantImportCandidateInput": {
+        "additionalProperties": false,
+        "properties": {
+          "candidate_ref": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Candidate Ref",
+            "type": "string"
+          },
+          "display_label": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Display Label"
+          },
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/CandidateDocumentRegisterRequest"
+            },
+            "maxItems": 10,
+            "title": "Documents",
+            "type": "array"
+          }
+        },
+        "required": [
+          "candidate_ref"
+        ],
+        "title": "ApplicantImportCandidateInput",
+        "type": "object"
+      },
+      "ApplicantImportRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/ApplicantImportCandidateInput"
+            },
+            "minItems": 1,
+            "title": "Candidates",
+            "type": "array"
+          },
+          "synthetic": {
+            "title": "Synthetic",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "synthetic",
+          "candidates"
+        ],
+        "title": "ApplicantImportRequest",
+        "type": "object"
+      },
+      "ApplicantSetConfirmRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "applicant_set_version": {
+            "default": "v1",
+            "pattern": "^v[0-9][A-Za-z0-9._-]{0,31}$",
+            "title": "Applicant Set Version",
+            "type": "string"
+          },
+          "synthetic": {
+            "title": "Synthetic",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "synthetic"
+        ],
+        "title": "ApplicantSetConfirmRequest",
+        "type": "object"
+      },
       "ApprovedRubricRegisterRequest": {
         "additionalProperties": false,
         "properties": {
@@ -50,6 +164,80 @@
           "criteria"
         ],
         "title": "ApprovedRubricRegisterRequest",
+        "type": "object"
+      },
+      "CandidateDocumentRegisterRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "content_text": {
+            "maxLength": 20000,
+            "minLength": 1,
+            "title": "Content Text",
+            "type": "string"
+          },
+          "document_type": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Document Type",
+            "type": "string"
+          },
+          "file_name": {
+            "anyOf": [
+              {
+                "maxLength": 240,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "File Name"
+          },
+          "mime_type": {
+            "default": "text/plain",
+            "enum": [
+              "text/plain",
+              "text/markdown"
+            ],
+            "title": "Mime Type",
+            "type": "string"
+          },
+          "source_label": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Source Label"
+          },
+          "source_origin": {
+            "enum": [
+              "manual_upload",
+              "fixture",
+              "adp_export",
+              "external_reference"
+            ],
+            "title": "Source Origin",
+            "type": "string"
+          },
+          "synthetic": {
+            "title": "Synthetic",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "document_type",
+          "source_origin",
+          "synthetic",
+          "content_text"
+        ],
+        "title": "CandidateDocumentRegisterRequest",
         "type": "object"
       },
       "CaseEnvelope": {
@@ -707,7 +895,7 @@
     }
   },
   "info": {
-    "description": "Advisory, evidence-grounded single-candidate evaluation plus the E9 recruitment-case state foundation, E10 source-document registry, and E11 role-intake/rubric foundation. Evaluation results are decision support for a human reviewer (decision_support_only=true, human_review_required=true) \u2014 never a hiring decision, ranking, or candidate contact. Case endpoints create and retrieve deterministic workflow state, source-document endpoints register small synthetic inline role source text, and E11 endpoints version synthetic role-intake and approved rubric artifacts through the workflow Table/Blob seam only; they do not import applicants, create candidate packages, start assessment jobs, send notifications, call Foundry/model backends, create queue messages, unlock assessment, or change Copilot Studio. Authentication uses SIMULATED lab identity headers (X-Lab-Actor-Id, X-Lab-Roles; the 'hr' role is required); this is a lab stand-in, never an Entra substitute. Envelope status vocabulary: completed | blocked | validation_failed | unauthorized are emitted; needs_input and error are RESERVED. HTTP mapping per the adopted API contracts: business outcomes return 200 with the envelope status; 400 malformed body; 401 missing identity; 403 authenticated without the required role.",
+    "description": "Advisory, evidence-grounded single-candidate evaluation plus the E9 recruitment-case state foundation, E10 source-document registry, and E11 role-intake/rubric foundation, and E12 applicant/candidate-package intake foundation. Evaluation results are decision support for a human reviewer (decision_support_only=true, human_review_required=true) \u2014 never a hiring decision, ranking, or candidate contact. Case endpoints create and retrieve deterministic workflow state, source-document endpoints register small synthetic inline role source text, and E11 endpoints version synthetic role-intake and approved rubric artifacts through the workflow Table/Blob seam only. E12 applicant endpoints register up to five synthetic applicants, candidate-linked document metadata, package metadata artifacts, computed import findings, and applicant-set confirmation through the same workflow Table/Blob seam. Case/applicant endpoints do not start assessment jobs, send notifications, call Foundry/model backends, create queue messages, unlock assessment, or change Copilot Studio. Authentication uses SIMULATED lab identity headers (X-Lab-Actor-Id, X-Lab-Roles; the 'hr' role is required); this is a lab stand-in, never an Entra substitute. Envelope status vocabulary: completed | blocked | validation_failed | unauthorized are emitted; needs_input and error are RESERVED. HTTP mapping per the adopted API contracts: business outcomes return 200 with the envelope status; 400 malformed body; 401 missing identity; 403 authenticated without the required role.",
     "title": "AI HR Hiring Agent Lab API",
     "version": "1.0.0"
   },
@@ -800,6 +988,405 @@
           }
         },
         "summary": "Retrieve one recruitment case state snapshot"
+      }
+    },
+    "/api/cases/{case_id}/applicant-imports": {
+      "post": {
+        "description": "Processes a small synthetic applicant batch for the first demo. The whole batch is preflighted before writes, and the active applicant cap is five candidates. The endpoint writes candidate document raw Blobs, package metadata Blobs, Table metadata, and one case event. It does not create a persistent import manifest, start assessment, enqueue work, call Foundry/model backends, or alter Copilot Studio.",
+        "operationId": "processApplicantImport",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional caller-supplied correlation id, echoed on early failures. Completed applicant-intake responses return the case correlation id.",
+            "in": "header",
+            "name": "X-Correlation-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplicantImportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Process a deterministic synthetic applicant import"
+      }
+    },
+    "/api/cases/{case_id}/applicant-set/confirm": {
+      "post": {
+        "description": "Confirms the applicant set only when at least one complete candidate package exists and no active applicant has blocking findings. A successful confirmation satisfies only the applicant-set gate; assessment remains locked for later readiness/assessment slices.",
+        "operationId": "confirmApplicantSet",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional caller-supplied correlation id, echoed on early failures. Completed applicant-intake responses return the case correlation id.",
+            "in": "header",
+            "name": "X-Correlation-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplicantSetConfirmRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Confirm the applicant set for later assessment readiness"
+      }
+    },
+    "/api/cases/{case_id}/applicants": {
+      "get": {
+        "description": "Returns applicant, candidate-package, and computed finding metadata for one recruitment case. The endpoint does not read or expose raw candidate document text.",
+        "operationId": "listCaseApplicants",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional caller-supplied correlation id, echoed on early failures. Completed applicant-intake responses return the case correlation id.",
+            "in": "header",
+            "name": "X-Correlation-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List applicant and package metadata for one recruitment case"
+      },
+      "post": {
+        "description": "Registers one synthetic applicant and initializes a candidate package. The endpoint writes package metadata through the workflow Blob seam and writes Applicant, CandidatePackage, event, task, gate, and case state rows through the workflow Table seam. It does not start assessment, enqueue work, call Foundry/model backends, or alter Copilot Studio.",
+        "operationId": "registerApplicant",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional caller-supplied correlation id, echoed on early failures. Completed applicant-intake responses return the case correlation id.",
+            "in": "header",
+            "name": "X-Correlation-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplicantCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Register one synthetic applicant for a recruitment case"
+      }
+    },
+    "/api/cases/{case_id}/applicants/{candidate_id}": {
+      "get": {
+        "description": "Returns one applicant, candidate-document metadata summaries, package metadata, and computed findings. The endpoint does not read or expose raw candidate document text.",
+        "operationId": "getCaseApplicant",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "candidate_id",
+            "required": true,
+            "schema": {
+              "title": "Candidate Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional caller-supplied correlation id, echoed on early failures. Completed applicant-intake responses return the case correlation id.",
+            "in": "header",
+            "name": "X-Correlation-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Retrieve one applicant package summary"
+      }
+    },
+    "/api/cases/{case_id}/candidates/{candidate_id}/documents": {
+      "post": {
+        "description": "Registers one synthetic candidate-linked document and refreshes the candidate package metadata artifact. Unsupported document types are reported as deterministic validation failures. The endpoint does not start assessment, enqueue work, call Foundry/model backends, or alter Copilot Studio.",
+        "operationId": "registerCandidateDocument",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "candidate_id",
+            "required": true,
+            "schema": {
+              "title": "Candidate Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional caller-supplied correlation id, echoed on early failures. Completed applicant-intake responses return the case correlation id.",
+            "in": "header",
+            "name": "X-Correlation-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CandidateDocumentRegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Register one synthetic candidate document"
+      }
+    },
+    "/api/cases/{case_id}/import-findings": {
+      "get": {
+        "description": "Computes applicant-import findings from Applicants, candidate-linked SourceDocuments, and CandidatePackages. Findings are not persisted as a separate v1 table.",
+        "operationId": "getImportFindings",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "title": "Case Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional caller-supplied correlation id, echoed on early failures. Completed applicant-intake responses return the case correlation id.",
+            "in": "header",
+            "name": "X-Correlation-Id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get computed applicant import findings"
       }
     },
     "/api/cases/{case_id}/next-actions": {
